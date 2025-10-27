@@ -1,0 +1,196 @@
+using System.Text.Json;
+using ADOTTA.Projects.Suite.Api.DTOs;
+using ADOTTA.Projects.Suite.Api.Services.Mappers;
+
+namespace ADOTTA.Projects.Suite.Api.Services;
+
+public class ProjectService : IProjectService
+{
+    private readonly ISAPServiceLayerClient _sapClient;
+    private readonly ILogger<ProjectService> _logger;
+
+    public ProjectService(ISAPServiceLayerClient sapClient, ILogger<ProjectService> logger)
+    {
+        _sapClient = sapClient;
+        _logger = logger;
+    }
+
+    public async Task<List<ProjectDto>> GetAllProjectsAsync(string sessionId)
+    {
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOPROJECT", null, sessionId);
+        return sapData.Select(MapToProjectDto).ToList();
+    }
+
+    public async Task<ProjectDto?> GetProjectByCodeAsync(string numeroProgetto, string sessionId)
+    {
+        try
+        {
+            var sapData = await _sapClient.GetRecordAsync<JsonElement>("@AOPROJECT", numeroProgetto, sessionId);
+            if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
+            
+            var project = ProjectMapper.MapSapUDOToProject(sapData);
+            
+            // Load related data
+            project.Livelli = await GetLivelliAsync(numeroProgetto, sessionId);
+            project.Prodotti = await GetProdottiAsync(numeroProgetto, sessionId);
+            
+            return project;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    public async Task<ProjectDto> CreateProjectAsync(ProjectDto project, string sessionId)
+    {
+        var sapUDO = ProjectMapper.MapProjectToSapUDO(project);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>("@AOPROJECT", sapUDO, sessionId);
+        return ProjectMapper.MapSapUDOToProject(result);
+    }
+
+    public async Task<ProjectDto> UpdateProjectAsync(string numeroProgetto, ProjectDto project, string sessionId)
+    {
+        var sapUDO = ProjectMapper.MapProjectToSapUDO(project);
+        var result = await _sapClient.UpdateRecordAsync<JsonElement>("@AOPROJECT", numeroProgetto, sapUDO, sessionId);
+        return ProjectMapper.MapSapUDOToProject(result);
+    }
+
+    public async Task DeleteProjectAsync(string numeroProgetto, string sessionId)
+    {
+        await _sapClient.DeleteRecordAsync("@AOPROJECT", numeroProgetto, sessionId);
+    }
+
+    public async Task<List<ProjectDto>> SearchProjectsAsync(string searchTerm, string sessionId)
+    {
+        var filter = $"(contains(Code, '{searchTerm}') or contains(Name, '{searchTerm}') or contains(U_Cliente, '{searchTerm}'))";
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOPROJECT", filter, sessionId);
+        return sapData.Select(MapToProjectDto).ToList();
+    }
+
+    public async Task<List<ProjectDto>> FilterProjectsAsync(FilterRequestDto filter, string sessionId)
+    {
+        var filterConditions = new List<string>();
+        
+        if (filter.Stato.HasValue)
+            filterConditions.Add($"U_StatoProgetto eq '{filter.Stato}'");
+        
+        if (!string.IsNullOrEmpty(filter.Cliente))
+            filterConditions.Add($"contains(U_Cliente, '{filter.Cliente}')");
+        
+        if (!string.IsNullOrEmpty(filter.ProjectManager))
+            filterConditions.Add($"contains(U_ProjectManager, '{filter.ProjectManager}')");
+        
+        if (filter.DataCreazioneDa.HasValue)
+            filterConditions.Add($"U_DataCreazione ge '{filter.DataCreazioneDa.Value:yyyy-MM-dd}'");
+        
+        if (filter.DataCreazioneA.HasValue)
+            filterConditions.Add($"U_DataCreazione le '{filter.DataCreazioneA.Value:yyyy-MM-dd}'");
+        
+        var filterStr = string.Join(" and ", filterConditions);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOPROJECT", filterStr, sessionId);
+        return sapData.Select(MapToProjectDto).ToList();
+    }
+
+    public async Task<List<LivelloProgettoDto>> GetLivelliAsync(string numeroProgetto, string sessionId)
+    {
+        var filter = $"U_Parent eq '{numeroProgetto}'";
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOPROJLVL", filter, sessionId);
+        return sapData.Select(MapToLivelloDto).ToList();
+    }
+
+    public async Task<LivelloProgettoDto> CreateLivelloAsync(string numeroProgetto, LivelloProgettoDto livello, string sessionId)
+    {
+        var sapUDO = ProjectMapper.MapLivelloToSap(livello, numeroProgetto);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>("@AOPROJLVL", sapUDO, sessionId);
+        return MapToLivelloDto(result);
+    }
+
+    public async Task DeleteLivelloAsync(string numeroProgetto, int livelloId, string sessionId)
+    {
+        var code = $"{numeroProgetto}-L{livelloId}";
+        await _sapClient.DeleteRecordAsync("@AOPROJLVL", code, sessionId);
+    }
+
+    public async Task<List<ProdottoProgettoDto>> GetProdottiAsync(string numeroProgetto, string sessionId)
+    {
+        var filter = $"U_Parent eq '{numeroProgetto}'";
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOPROPRD", filter, sessionId);
+        return sapData.Select(MapToProdottoDto).ToList();
+    }
+
+    public async Task<ProdottoProgettoDto> CreateProdottoAsync(string numeroProgetto, ProdottoProgettoDto prodotto, string sessionId)
+    {
+        var sapUDO = ProjectMapper.MapProdottoToSap(prodotto, numeroProgetto);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>("@AOPROPRD", sapUDO, sessionId);
+        return MapToProdottoDto(result);
+    }
+
+    public async Task DeleteProdottoAsync(string numeroProgetto, int prodottoId, string sessionId)
+    {
+        var code = $"{numeroProgetto}-P{prodottoId}";
+        await _sapClient.DeleteRecordAsync("@AOPROPRD", code, sessionId);
+    }
+
+    public async Task<List<StoricoModificaDto>> GetStoricoAsync(string numeroProgetto, string sessionId)
+    {
+        var filter = $"U_Parent eq '{numeroProgetto}'";
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOPROHIST", filter, sessionId);
+        return sapData.Select(MapToStoricoDto).ToList();
+    }
+
+    public async Task<ProjectStatsDto> GetProjectStatsAsync(string sessionId)
+    {
+        var allProjects = await GetAllProjectsAsync(sessionId);
+        
+        return new ProjectStatsDto
+        {
+            ProgettiAttivi = allProjects.Count(p => p.StatoProgetto.ToString() == "ON_GOING"),
+            ValorePortfolio = allProjects.Sum(p => p.ValoreProgetto ?? 0),
+            InstallazioniMese = allProjects.Count(p => p.DataInizioInstallazione?.Month == DateTime.Now.Month),
+            ProgettiRitardo = allProjects.Count(p => p.IsInRitardo)
+        };
+    }
+
+    private ProjectDto MapToProjectDto(JsonElement sapData)
+    {
+        return ProjectMapper.MapSapUDOToProject(sapData);
+    }
+
+    private LivelloProgettoDto MapToLivelloDto(JsonElement sapData)
+    {
+        return new LivelloProgettoDto
+        {
+            Nome = sapData.TryGetProperty("Name", out var name) ? name.GetString() ?? "" : "",
+            Ordine = sapData.TryGetProperty("U_Ordine", out var order) ? order.GetInt32() : 0,
+            Descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() : null,
+            DataInizioInstallazione = sapData.TryGetProperty("U_DataInizio", out var start) && DateTime.TryParse(start.GetString(), out var dtStart) ? dtStart : null,
+            DataFineInstallazione = sapData.TryGetProperty("U_DataFine", out var end) && DateTime.TryParse(end.GetString(), out var dtEnd) ? dtEnd : null,
+            DataCaricamento = sapData.TryGetProperty("U_DataCaricamento", out var load) && DateTime.TryParse(load.GetString(), out var dtLoad) ? dtLoad : null
+        };
+    }
+
+    private ProdottoProgettoDto MapToProdottoDto(JsonElement sapData)
+    {
+        return new ProdottoProgettoDto
+        {
+            TipoProdotto = sapData.TryGetProperty("U_TipoProdotto", out var tipo) ? tipo.GetString() ?? "" : "",
+            Variante = sapData.TryGetProperty("U_Variante", out var variant) ? variant.GetString() ?? "" : "",
+            QMq = sapData.TryGetProperty("U_QMq", out var qmq) ? qmq.GetDecimal() : 0,
+            QFt = sapData.TryGetProperty("U_QFt", out var qft) ? qft.GetDecimal() : 0
+        };
+    }
+
+    private StoricoModificaDto MapToStoricoDto(JsonElement sapData)
+    {
+        return new StoricoModificaDto
+        {
+            DataModifica = sapData.TryGetProperty("U_DataModifica", out var date) && DateTime.TryParse(date.GetString(), out var dt) ? dt : DateTime.MinValue,
+            UtenteModifica = sapData.TryGetProperty("U_UtenteModifica", out var user) ? user.GetString() ?? "" : "",
+            CampoModificato = sapData.TryGetProperty("Name", out var field) ? field.GetString() ?? "" : "",
+            ValorePrecedente = sapData.TryGetProperty("U_ValorePrecedente", out var oldVal) ? oldVal.GetString() : null,
+            NuovoValore = sapData.TryGetProperty("U_NuovoValore", out var newVal) ? newVal.GetString() : null
+        };
+    }
+}
+
