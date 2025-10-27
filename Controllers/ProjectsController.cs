@@ -237,6 +237,21 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [HttpPost("{numeroProgetto}/wic-snapshot")]
+    public async Task<ActionResult<List<StoricoModificaDto>>> CreateWicSnapshot(string numeroProgetto)
+    {
+        try
+        {
+            var snapshot = await _projectService.CreateWicSnapshotAsync(numeroProgetto, GetSessionId());
+            return Ok(snapshot);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating WIC snapshot for project: {NumeroProgetto}", numeroProgetto);
+            return StatusCode(500, new { message = "Error creating WIC snapshot", error = ex.Message });
+        }
+    }
+
     [HttpGet("stats")]
     public async Task<ActionResult<ProjectStatsDto>> GetStats()
     {
@@ -248,6 +263,36 @@ public class ProjectsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting project stats");
+            return StatusCode(500, new { message = "Error retrieving stats", error = ex.Message });
+        }
+    }
+
+    [HttpGet("stats/by-status")]
+    public async Task<ActionResult<List<ProjectStatsByStatusDto>>> GetStatsByStatus()
+    {
+        try
+        {
+            var stats = await _projectService.GetStatsByStatusAsync(GetSessionId());
+            return Ok(stats);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting project stats by status");
+            return StatusCode(500, new { message = "Error retrieving stats", error = ex.Message });
+        }
+    }
+
+    [HttpGet("stats/by-month")]
+    public async Task<ActionResult<List<ProjectStatsByMonthDto>>> GetStatsByMonth()
+    {
+        try
+        {
+            var stats = await _projectService.GetStatsByMonthAsync(GetSessionId());
+            return Ok(stats);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting project stats by month");
             return StatusCode(500, new { message = "Error retrieving stats", error = ex.Message });
         }
     }

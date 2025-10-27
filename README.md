@@ -93,6 +93,23 @@ Swagger UI disponibile su: `https://localhost:5001/swagger`
 - `GET /api/projects/search?q={term}` - Ricerca progetti
 - `POST /api/projects/filter` - Filtra progetti
 - `GET /api/projects/stats` - Statistiche progetti
+- `GET /api/projects/stats/by-status` - Statistiche per stato
+- `GET /api/projects/stats/by-month` - Statistiche per mese
+- `GET /api/projects/{numeroProgetto}/livelli` - Livelli progetto
+- `GET /api/projects/{numeroProgetto}/prodotti` - Prodotti progetto
+- `GET /api/projects/{numeroProgetto}/storico` - Storico modifiche
+- `POST /api/projects/{numeroProgetto}/wic-snapshot` - Crea snapshot WIC
+
+### Timesheet
+- `GET /api/timesheet` - Tutte le rendicontazioni
+- `GET /api/timesheet/{id}` - Dettagli rendicontazione
+- `POST /api/timesheet` - Crea rendicontazione
+- `PUT /api/timesheet/{id}` - Aggiorna rendicontazione
+- `DELETE /api/timesheet/{id}` - Elimina rendicontazione
+- `GET /api/timesheet/project/{numeroProgetto}` - Rendicontazioni per progetto
+- `GET /api/timesheet/overview` - Overview con statistiche
+- `GET /api/timesheet/summary` - Riepilogo statistiche
+- `GET /api/timesheet/user/{utente}` - Rendicontazioni per utente
 
 ### Lookup
 - `GET /api/lookup/clienti` - Lista clienti (Business Partners)

@@ -32,6 +32,7 @@ public class ProjectDto
 public class LivelloProgettoDto
 {
     public int Id { get; set; }
+    public string NumeroProgetto { get; set; } = string.Empty;
     public string Nome { get; set; } = string.Empty;
     public int Ordine { get; set; }
     public string? Descrizione { get; set; }
@@ -43,6 +44,7 @@ public class LivelloProgettoDto
 public class ProdottoProgettoDto
 {
     public int Id { get; set; }
+    public string NumeroProgetto { get; set; } = string.Empty;
     public string TipoProdotto { get; set; } = string.Empty;
     public string Variante { get; set; } = string.Empty;
     public decimal QMq { get; set; }
@@ -52,10 +54,13 @@ public class ProdottoProgettoDto
 public class StoricoModificaDto
 {
     public int Id { get; set; }
+    public string NumeroProgetto { get; set; } = string.Empty;
     public DateTime DataModifica { get; set; }
     public string UtenteModifica { get; set; } = string.Empty;
     public string CampoModificato { get; set; } = string.Empty;
     public string? ValorePrecedente { get; set; }
     public string? NuovoValore { get; set; }
+    public string? VersioneWIC { get; set; }
+    public string? Descrizione { get; set; }
 }
 

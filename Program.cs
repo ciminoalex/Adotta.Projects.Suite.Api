@@ -23,6 +23,7 @@ builder.Services.Configure<SAPSettings>(builder.Configuration.GetSection("SAPSet
 builder.Services.AddHttpClient<ISAPServiceLayerClient, SAPServiceLayerClient>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<ILookupService, LookupService>();
+builder.Services.AddScoped<ITimesheetService, TimesheetService>();
 
 // Register validators
 builder.Services.AddValidatorsFromAssemblyContaining<ProjectValidator>();

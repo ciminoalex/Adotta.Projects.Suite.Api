@@ -139,6 +139,29 @@ public class ProjectService : IProjectService
         return sapData.Select(MapToStoricoDto).ToList();
     }
 
+    public async Task<List<StoricoModificaDto>> CreateWicSnapshotAsync(string numeroProgetto, string sessionId)
+    {
+        // Get current project
+        var project = await GetProjectByCodeAsync(numeroProgetto, sessionId);
+        if (project == null) return new List<StoricoModificaDto>();
+
+        // Create snapshot entries for all project fields
+        var snapshot = new List<StoricoModificaDto>
+        {
+            new StoricoModificaDto
+            {
+                NumeroProgetto = numeroProgetto,
+                DataModifica = DateTime.UtcNow,
+                UtenteModifica = "System",
+                CampoModificato = "WIC Snapshot",
+                Descrizione = $"WIC Snapshot created at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}",
+                VersioneWIC = project.VersioneWIC ?? "1.0"
+            }
+        };
+
+        return snapshot;
+    }
+
     public async Task<ProjectStatsDto> GetProjectStatsAsync(string sessionId)
     {
         var allProjects = await GetAllProjectsAsync(sessionId);
@@ -152,6 +175,35 @@ public class ProjectService : IProjectService
         };
     }
 
+    public async Task<List<ProjectStatsByStatusDto>> GetStatsByStatusAsync(string sessionId)
+    {
+        var allProjects = await GetAllProjectsAsync(sessionId);
+        
+        return allProjects
+            .GroupBy(p => p.StatoProgetto.ToString())
+            .Select(g => new ProjectStatsByStatusDto
+            {
+                Stato = g.Key,
+                Count = g.Count()
+            })
+            .ToList();
+    }
+
+    public async Task<List<ProjectStatsByMonthDto>> GetStatsByMonthAsync(string sessionId)
+    {
+        var allProjects = await GetAllProjectsAsync(sessionId);
+        
+        return allProjects
+            .GroupBy(p => p.DataCreazione.ToString("MMM yyyy"))
+            .OrderBy(g => g.First().DataCreazione)
+            .Select(g => new ProjectStatsByMonthDto
+            {
+                Label = g.Key,
+                Value = g.Count()
+            })
+            .ToList();
+    }
+
     private ProjectDto MapToProjectDto(JsonElement sapData)
     {
         return ProjectMapper.MapSapUDOToProject(sapData);
@@ -161,6 +213,8 @@ public class ProjectService : IProjectService
     {
         return new LivelloProgettoDto
         {
+            Id = sapData.TryGetProperty("Code", out var code) ? int.Parse(code.GetString() ?? "0") : 0,
+            NumeroProgetto = sapData.TryGetProperty("U_Parent", out var parent) ? parent.GetString() ?? "" : "",
             Nome = sapData.TryGetProperty("Name", out var name) ? name.GetString() ?? "" : "",
             Ordine = sapData.TryGetProperty("U_Ordine", out var order) ? order.GetInt32() : 0,
             Descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() : null,
@@ -174,6 +228,8 @@ public class ProjectService : IProjectService
     {
         return new ProdottoProgettoDto
         {
+            Id = sapData.TryGetProperty("Code", out var code) ? int.Parse(code.GetString() ?? "0") : 0,
+            NumeroProgetto = sapData.TryGetProperty("U_Parent", out var parent) ? parent.GetString() ?? "" : "",
             TipoProdotto = sapData.TryGetProperty("U_TipoProdotto", out var tipo) ? tipo.GetString() ?? "" : "",
             Variante = sapData.TryGetProperty("U_Variante", out var variant) ? variant.GetString() ?? "" : "",
             QMq = sapData.TryGetProperty("U_QMq", out var qmq) ? qmq.GetDecimal() : 0,
@@ -185,11 +241,15 @@ public class ProjectService : IProjectService
     {
         return new StoricoModificaDto
         {
+            Id = sapData.TryGetProperty("Code", out var code) ? int.Parse(code.GetString() ?? "0") : 0,
+            NumeroProgetto = sapData.TryGetProperty("U_Parent", out var parent) ? parent.GetString() ?? "" : "",
             DataModifica = sapData.TryGetProperty("U_DataModifica", out var date) && DateTime.TryParse(date.GetString(), out var dt) ? dt : DateTime.MinValue,
             UtenteModifica = sapData.TryGetProperty("U_UtenteModifica", out var user) ? user.GetString() ?? "" : "",
             CampoModificato = sapData.TryGetProperty("Name", out var field) ? field.GetString() ?? "" : "",
             ValorePrecedente = sapData.TryGetProperty("U_ValorePrecedente", out var oldVal) ? oldVal.GetString() : null,
-            NuovoValore = sapData.TryGetProperty("U_NuovoValore", out var newVal) ? newVal.GetString() : null
+            NuovoValore = sapData.TryGetProperty("U_NuovoValore", out var newVal) ? newVal.GetString() : null,
+            VersioneWIC = sapData.TryGetProperty("U_VersioneWIC", out var version) ? version.GetString() : null,
+            Descrizione = null
         };
     }
 }

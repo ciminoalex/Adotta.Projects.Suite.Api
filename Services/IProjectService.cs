@@ -18,6 +18,9 @@ public interface IProjectService
     Task<ProdottoProgettoDto> CreateProdottoAsync(string numeroProgetto, ProdottoProgettoDto prodotto, string sessionId);
     Task DeleteProdottoAsync(string numeroProgetto, int prodottoId, string sessionId);
     Task<List<StoricoModificaDto>> GetStoricoAsync(string numeroProgetto, string sessionId);
+    Task<List<StoricoModificaDto>> CreateWicSnapshotAsync(string numeroProgetto, string sessionId);
     Task<ProjectStatsDto> GetProjectStatsAsync(string sessionId);
+    Task<List<ProjectStatsByStatusDto>> GetStatsByStatusAsync(string sessionId);
+    Task<List<ProjectStatsByMonthDto>> GetStatsByMonthAsync(string sessionId);
 }
 

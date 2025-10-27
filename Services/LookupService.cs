@@ -150,6 +150,15 @@ public class LookupService : ILookupService
 
     private TeamTecnico MapToTeamTecnico(JsonElement sapData)
     {
+        var membri = new List<string>();
+        if (sapData.TryGetProperty("U_Membri", out var memb))
+        {
+            if (memb.ValueKind == JsonValueKind.String)
+            {
+                membri.AddRange(memb.GetString()?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Enumerable.Empty<string>());
+            }
+        }
+
         return new TeamTecnico
         {
             Id = sapData.TryGetProperty("Code", out var code) ? code.GetString() ?? "" : "",
@@ -157,19 +166,30 @@ public class LookupService : ILookupService
             Specializzazione = sapData.TryGetProperty("U_Specializzazione", out var spec) ? spec.GetString() : null,
             Email = sapData.TryGetProperty("U_Email", out var email) ? email.GetString() : null,
             Telefono = sapData.TryGetProperty("U_Telefono", out var phone) ? phone.GetString() : null,
-            Disponibilita = sapData.TryGetProperty("U_Disponibilita", out var disp) ? disp.GetString() == "Y" : true
+            Disponibilita = sapData.TryGetProperty("U_Disponibilita", out var disp) ? disp.GetString() == "Y" : true,
+            Membri = membri.Any() ? membri : null
         };
     }
 
     private TeamAPL MapToTeamAPL(JsonElement sapData)
     {
+        var competenze = new List<string>();
+        if (sapData.TryGetProperty("U_Competenze", out var comp))
+        {
+            if (comp.ValueKind == JsonValueKind.String)
+            {
+                competenze.AddRange(comp.GetString()?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Enumerable.Empty<string>());
+            }
+        }
+
         return new TeamAPL
         {
             Id = sapData.TryGetProperty("Code", out var code) ? code.GetString() ?? "" : "",
             Nome = sapData.TryGetProperty("Name", out var name) ? name.GetString() ?? "" : "",
             Email = sapData.TryGetProperty("U_Email", out var email) ? email.GetString() : null,
             Telefono = sapData.TryGetProperty("U_Telefono", out var phone) ? phone.GetString() : null,
-            Area = sapData.TryGetProperty("U_Area", out var area) ? area.GetString() : null
+            Area = sapData.TryGetProperty("U_Area", out var area) ? area.GetString() : null,
+            Competenze = competenze.Any() ? competenze : null
         };
     }
 
@@ -188,18 +208,38 @@ public class LookupService : ILookupService
 
     private ProjectManager MapToProjectManager(JsonElement sapData)
     {
+        var certificazioni = new List<string>();
+        if (sapData.TryGetProperty("U_Certificazioni", out var cert))
+        {
+            if (cert.ValueKind == JsonValueKind.String)
+            {
+                certificazioni.AddRange(cert.GetString()?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Enumerable.Empty<string>());
+            }
+        }
+
         return new ProjectManager
         {
             Id = sapData.TryGetProperty("Code", out var code) ? code.GetString() ?? "" : "",
             Nome = sapData.TryGetProperty("Name", out var name) ? name.GetString() ?? "" : "",
             Email = sapData.TryGetProperty("U_Email", out var email) ? email.GetString() : null,
             Telefono = sapData.TryGetProperty("U_Telefono", out var phone) ? phone.GetString() : null,
-            Esperienza = sapData.TryGetProperty("U_Esperienza", out var exp) ? exp.GetString() : null
+            Esperienza = sapData.TryGetProperty("U_Esperienza", out var exp) ? exp.GetString() : null,
+            ProgettiAttivi = sapData.TryGetProperty("U_ProgettiAttivi", out var proj) ? proj.GetInt32() : null,
+            Certificazioni = certificazioni.Any() ? certificazioni : null
         };
     }
 
     private SquadraInstallazione MapToSquadraInstallazione(JsonElement sapData)
     {
+        var competenze = new List<string>();
+        if (sapData.TryGetProperty("U_Competenze", out var comp))
+        {
+            if (comp.ValueKind == JsonValueKind.String)
+            {
+                competenze.AddRange(comp.GetString()?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Enumerable.Empty<string>());
+            }
+        }
+
         return new SquadraInstallazione
         {
             Id = sapData.TryGetProperty("Code", out var code) ? code.GetString() ?? "" : "",
@@ -207,12 +247,22 @@ public class LookupService : ILookupService
             Tipo = sapData.TryGetProperty("U_Tipo", out var tipo) ? tipo.GetString() : null,
             Contatto = sapData.TryGetProperty("U_Contatto", out var cont) ? cont.GetString() : null,
             Disponibilita = sapData.TryGetProperty("U_Disponibilita", out var disp) ? disp.GetString() == "Y" : true,
-            NumeroMembri = sapData.TryGetProperty("U_NumeroMembri", out var membri) ? membri.GetInt32() : null
+            NumeroMembri = sapData.TryGetProperty("U_NumeroMembri", out var membri) ? membri.GetInt32() : null,
+            Competenze = competenze.Any() ? competenze : null
         };
     }
 
     private ProdottoMaster MapToProdottoMaster(JsonElement sapData)
     {
+        var varianti = new List<string>();
+        if (sapData.TryGetProperty("U_Varianti", out var vari))
+        {
+            if (vari.ValueKind == JsonValueKind.String)
+            {
+                varianti.AddRange(vari.GetString()?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Enumerable.Empty<string>());
+            }
+        }
+
         return new ProdottoMaster
         {
             Id = sapData.TryGetProperty("Code", out var code) ? code.GetString() ?? "" : "",
@@ -220,7 +270,8 @@ public class LookupService : ILookupService
             Categoria = sapData.TryGetProperty("U_Categoria", out var cat) ? cat.GetString() ?? "" : "",
             UnitaMisura = sapData.TryGetProperty("U_UnitaMisura", out var unit) ? unit.GetString() ?? "" : "",
             CodiceSAP = sapData.TryGetProperty("U_CodiceSAP", out var sapCode) ? sapCode.GetString() : null,
-            Descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() : null
+            Descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() : null,
+            VariantiDisponibili = varianti.Any() ? varianti : null
         };
     }
 }
