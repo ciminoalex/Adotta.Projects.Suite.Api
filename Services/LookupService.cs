@@ -29,7 +29,7 @@ public class LookupService : ILookupService
 
     public async Task<List<Stato>> GetAllStatiAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOSTATI", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_STATI", null, sessionId);
         return sapData.Select(MapToStato).ToList();
     }
 
@@ -40,37 +40,37 @@ public class LookupService : ILookupService
         {
             filter = $"U_StatoId eq '{statoId}'";
         }
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOCITTA", filter, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_CITTA", filter, sessionId);
         return sapData.Select(MapToCitta).ToList();
     }
 
     public async Task<List<TeamTecnico>> GetAllTeamTecniciAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOTEAMTECH", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_TEAMTECH", null, sessionId);
         return sapData.Select(MapToTeamTecnico).ToList();
     }
 
     public async Task<List<TeamAPL>> GetAllTeamAPLAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOTEAMAPL", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_TEAMAPL", null, sessionId);
         return sapData.Select(MapToTeamAPL).ToList();
     }
 
     public async Task<List<Sales>> GetAllSalesAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOSALES", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_SALES", null, sessionId);
         return sapData.Select(MapToSales).ToList();
     }
 
     public async Task<List<ProjectManager>> GetAllProjectManagersAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOPMGR", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_PMGR", null, sessionId);
         return sapData.Select(MapToProjectManager).ToList();
     }
 
     public async Task<List<SquadraInstallazione>> GetAllSquadreInstallazioneAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOSQUADRA", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_SQUADRA", null, sessionId);
         return sapData.Select(MapToSquadraInstallazione).ToList();
     }
 
@@ -81,7 +81,7 @@ public class LookupService : ILookupService
         {
             filter = $"U_Categoria eq '{categoria}'";
         }
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AOPRODMAST", filter, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_PRODMAST", filter, sessionId);
         return sapData.Select(MapToProdottoMaster).ToList();
     }
 

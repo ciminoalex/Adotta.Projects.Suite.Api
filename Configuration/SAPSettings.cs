@@ -8,5 +8,6 @@ public class SAPSettings
     public string? Password { get; set; }
     public string DefaultLanguage { get; set; } = "en";
     public int SessionTimeout { get; set; } = 30;
+    public bool AllowUntrustedServerCertificate { get; set; } = false;
 }
 

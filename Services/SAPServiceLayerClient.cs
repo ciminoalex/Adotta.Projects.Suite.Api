@@ -18,7 +18,12 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
         _settings = settings.Value;
         _logger = logger;
         
-        _httpClient.BaseAddress = new Uri(_settings.ServiceLayerUrl);
+        var baseUrl = _settings.ServiceLayerUrl?.Trim() ?? string.Empty;
+        if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
+        {
+            baseUrl += "/";
+        }
+        _httpClient.BaseAddress = new Uri(baseUrl);
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
@@ -26,12 +31,27 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
     {
         try
         {
-            var loginUrl = $"{_httpClient.BaseAddress}/Login";
-            var response = await _httpClient.PostAsJsonAsync(loginUrl, request);
+            var serializeOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = null,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never
+            };
+            // Preflight to get ROUTEID/sticky cookie from the load balancer
+            try
+            {
+                using var preflight = await _httpClient.GetAsync(string.Empty);
+                // No need to check status; we only want Set-Cookie
+            }
+            catch (Exception pfEx)
+            {
+                _logger.LogDebug(pfEx, "Preflight request before SAP Login failed; continuing to Login");
+            }
+
+            var response = await _httpClient.PostAsJsonAsync("Login", request, serializeOptions);
             
             if (response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+                var result = await response.Content.ReadFromJsonAsync<LoginResponse>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (result != null)
                 {
                     _logger.LogInformation("SAP Login successful. SessionId: {SessionId}", result.SessionId);
@@ -74,7 +94,7 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
     {
         try
         {
-            var url = $"{_httpClient.BaseAddress}/{tableName}";
+            var url = tableName;
             if (!string.IsNullOrEmpty(filter))
             {
                 url += $"?$filter={Uri.EscapeDataString(filter)}";
@@ -115,7 +135,7 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
     {
         try
         {
-            var url = $"{_httpClient.BaseAddress}/{tableName}('{code}')";
+            var url = $"{tableName}('{code}')";
             
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             if (!string.IsNullOrEmpty(sessionId))
@@ -146,11 +166,11 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
     {
         try
         {
-            var url = $"{_httpClient.BaseAddress}/{tableName}";
+            var url = tableName;
             
             var request = new HttpRequestMessage(HttpMethod.Post, url)
             {
-                Content = JsonContent.Create(record)
+                Content = JsonContent.Create(record, options: new JsonSerializerOptions { PropertyNamingPolicy = null })
             };
             
             if (!string.IsNullOrEmpty(sessionId))
@@ -175,11 +195,11 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
     {
         try
         {
-            var url = $"{_httpClient.BaseAddress}/{tableName}('{code}')";
+            var url = $"{tableName}('{code}')";
             
             var request = new HttpRequestMessage(HttpMethod.Patch, url)
             {
-                Content = JsonContent.Create(record)
+                Content = JsonContent.Create(record, options: new JsonSerializerOptions { PropertyNamingPolicy = null })
             };
             
             if (!string.IsNullOrEmpty(sessionId))
@@ -204,7 +224,7 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
     {
         try
         {
-            var url = $"{_httpClient.BaseAddress}/{tableName}('{code}')";
+            var url = $"{tableName}('{code}')";
             
             var request = new HttpRequestMessage(HttpMethod.Delete, url);
             if (!string.IsNullOrEmpty(sessionId))

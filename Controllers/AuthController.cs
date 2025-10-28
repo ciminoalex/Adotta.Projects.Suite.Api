@@ -26,8 +26,7 @@ public class AuthController : ControllerBase
             {
                 CompanyDB = request.CompanyDB,
                 UserName = request.UserName,
-                Password = request.Password,
-                Language = request.Language
+                Password = request.Password
             };
 
             var response = await _sapClient.LoginAsync(loginRequest);
