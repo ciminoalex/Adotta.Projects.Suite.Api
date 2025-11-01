@@ -37,18 +37,18 @@ public class InitializationService : IInitializationService
     {
         var tables = new[]
         {
-            new { Name = "AX_ADT_PROJECT", Description = "Progetti (UDO)", Type = "bott_MasterData" },
-            new { Name = "AX_ADT_PROJLVL", Description = "Livelli Progetto", Type = "bott_MasterDataLines" },
-            new { Name = "AX_ADT_PROPRD", Description = "Prodotti Progetto", Type = "bott_MasterDataLines" },
-            new { Name = "AX_ADT_PROHIST", Description = "Storico Modifiche", Type = "bott_MasterDataLines" },
-            new { Name = "AX_ADT_STATI", Description = "Stati", Type = "bott_MasterData" },
-            new { Name = "AX_ADT_CITTA", Description = "Città", Type = "bott_MasterData" },
-            new { Name = "AX_ADT_TEAMTECH", Description = "Team Tecnici", Type = "bott_MasterData" },
-            new { Name = "AX_ADT_TEAMAPL", Description = "Team APL", Type = "bott_MasterData" },
-            new { Name = "AX_ADT_SALES", Description = "Sales", Type = "bott_MasterData" },
-            new { Name = "AX_ADT_PMGR", Description = "Project Managers", Type = "bott_MasterData" },
-            new { Name = "AX_ADT_SQUADRA", Description = "Squadre Installazione", Type = "bott_MasterData" },
-            new { Name = "AX_ADT_PRODMAST", Description = "Prodotti Master", Type = "bott_MasterData" }
+            new { Name = "AX_ADT_PROJECT", Description = "Adt Prjs: Progetti", Type = "bott_MasterData" },
+            new { Name = "AX_ADT_PROJLVL", Description = "Adt Prjs: Livelli", Type = "bott_MasterDataLines" },
+            new { Name = "AX_ADT_PROPRD", Description = "Adt Prjs: Prodotti", Type = "bott_MasterDataLines" },
+            new { Name = "AX_ADT_PROHIST", Description = "Adt Prjs: Storico", Type = "bott_MasterDataLines" },
+            new { Name = "AX_ADT_STATI", Description = "Adt Prjs: Stati", Type = "bott_MasterData" },
+            new { Name = "AX_ADT_CITTA", Description = "Adt Prjs: Città", Type = "bott_MasterData" },
+            new { Name = "AX_ADT_TEAMTECH", Description = "Adt Prjs: Team Tecnici", Type = "bott_MasterData" },
+            new { Name = "AX_ADT_TEAMAPL", Description = "Adt Prjs: Team APL", Type = "bott_MasterData" },
+            new { Name = "AX_ADT_SALES", Description = "Adt Prjs: Sales", Type = "bott_MasterData" },
+            new { Name = "AX_ADT_PMGR", Description = "Adt Prjs: PM", Type = "bott_MasterData" },
+            new { Name = "AX_ADT_SQUADRA", Description = "Adt Prjs: Squadre Install", Type = "bott_MasterData" },
+            new { Name = "AX_ADT_PRODMAST", Description = "Adt Prjs: Prodotti Master", Type = "bott_MasterData" }
         };
 
         foreach (var t in tables)
@@ -157,19 +157,19 @@ public class InitializationService : IInitializationService
             var payload = new
             {
                 Code = udoCode,
-                Name = "Progetti",
+                Name = "Adt Prjs: Progetti",
                 ObjectType = "boud_MasterData",
-                TableName = "AX_ADT_PROJECT",
+                TableName = "@AX_ADT_PROJECT",
                 CanCreateDefaultForm = "tYES",
                 CanCancel = "tNO",
                 CanDelete = "tYES",
                 CanClose = "tNO",
                 ManageSeries = "tNO",
-                ChildTables = new[]
+                UserObjectMD_ChildTables = new[]
                 {
-                    new { TableName = "AX_ADT_PROJLVL" },
-                    new { TableName = "AX_ADT_PROPRD" },
-                    new { TableName = "AX_ADT_PROHIST" }
+                    new { ObjectName = "AX_ADT_PROJLVL", TableName = "@AX_ADT_PROJLVL" },
+                    new { ObjectName = "AX_ADT_PROPRD", TableName = "@AX_ADT_PROPRD" },
+                    new { ObjectName = "AX_ADT_PROHIST", TableName = "@AX_ADT_PROHIST" }
                 },
                 FindColumns = new[]
                 {
@@ -196,14 +196,14 @@ public class InitializationService : IInitializationService
         // Register UDOs for master data tables (no child tables)
         var otherUdos = new[]
         {
-            new { Code = "AX_ADT_STATI", Name = "Stati" },
-            new { Code = "AX_ADT_CITTA", Name = "Città" },
-            new { Code = "AX_ADT_TEAMTECH", Name = "Team Tecnici" },
-            new { Code = "AX_ADT_TEAMAPL", Name = "Team APL" },
-            new { Code = "AX_ADT_SALES", Name = "Sales" },
-            new { Code = "AX_ADT_PMGR", Name = "Project Managers" },
-            new { Code = "AX_ADT_SQUADRA", Name = "Squadre Installazione" },
-            new { Code = "AX_ADT_PRODMAST", Name = "Prodotti Master" }
+            new { Code = "AX_ADT_STATI", Name = "Adt Prjs: Stati" },
+            new { Code = "AX_ADT_CITTA", Name = "Adt Prjs: Città" },
+            new { Code = "AX_ADT_TEAMTECH", Name = "Adt Prjs: Team Tech" },
+            new { Code = "AX_ADT_TEAMAPL", Name = "Adt Prjs: Team APL" },
+            new { Code = "AX_ADT_SALES", Name = "Adt Prjs: Sales" },
+            new { Code = "AX_ADT_PMGR", Name = "Adt Prjs: PM" },
+            new { Code = "AX_ADT_SQUADRA", Name = "Adt Prjs: Squadre Install" },
+            new { Code = "AX_ADT_PRODMAST", Name = "Adt Prjs: Prod. Master" }
         };
 
         foreach (var u in otherUdos)
@@ -216,7 +216,7 @@ public class InitializationService : IInitializationService
                     Code = u.Code,
                     Name = u.Name,
                     ObjectType = "boud_MasterData",
-                    TableName = u.Code,
+                    TableName = $"@{u.Code}",
                     CanCreateDefaultForm = "tYES",
                     CanCancel = "tNO",
                     CanDelete = "tYES",

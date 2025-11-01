@@ -17,7 +17,7 @@ public class ProjectService : IProjectService
 
     public async Task<List<ProjectDto>> GetAllProjectsAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_PROJECT", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROJECT", null, sessionId);
         return sapData.Select(MapToProjectDto).ToList();
     }
 
@@ -25,7 +25,7 @@ public class ProjectService : IProjectService
     {
         try
         {
-            var sapData = await _sapClient.GetRecordAsync<JsonElement>("@AX_ADT_PROJECT", numeroProgetto, sessionId);
+            var sapData = await _sapClient.GetRecordAsync<JsonElement>("AX_ADT_PROJECT", numeroProgetto, sessionId);
             if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
             
             var project = ProjectMapper.MapSapUDOToProject(sapData);
@@ -45,26 +45,26 @@ public class ProjectService : IProjectService
     public async Task<ProjectDto> CreateProjectAsync(ProjectDto project, string sessionId)
     {
         var sapUDO = ProjectMapper.MapProjectToSapUDO(project);
-        var result = await _sapClient.CreateRecordAsync<JsonElement>("@AX_ADT_PROJECT", sapUDO, sessionId);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>("AX_ADT_PROJECT", sapUDO, sessionId);
         return ProjectMapper.MapSapUDOToProject(result);
     }
 
     public async Task<ProjectDto> UpdateProjectAsync(string numeroProgetto, ProjectDto project, string sessionId)
     {
         var sapUDO = ProjectMapper.MapProjectToSapUDO(project);
-        var result = await _sapClient.UpdateRecordAsync<JsonElement>("@AX_ADT_PROJECT", numeroProgetto, sapUDO, sessionId);
+        var result = await _sapClient.UpdateRecordAsync<JsonElement>("AX_ADT_PROJECT", numeroProgetto, sapUDO, sessionId);
         return ProjectMapper.MapSapUDOToProject(result);
     }
 
     public async Task DeleteProjectAsync(string numeroProgetto, string sessionId)
     {
-        await _sapClient.DeleteRecordAsync("@AX_ADT_PROJECT", numeroProgetto, sessionId);
+        await _sapClient.DeleteRecordAsync("AX_ADT_PROJECT", numeroProgetto, sessionId);
     }
 
     public async Task<List<ProjectDto>> SearchProjectsAsync(string searchTerm, string sessionId)
     {
         var filter = $"(contains(Code, '{searchTerm}') or contains(Name, '{searchTerm}') or contains(U_Cliente, '{searchTerm}'))";
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_PROJECT", filter, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROJECT", filter, sessionId);
         return sapData.Select(MapToProjectDto).ToList();
     }
 
@@ -88,54 +88,54 @@ public class ProjectService : IProjectService
             filterConditions.Add($"U_DataCreazione le '{filter.DataCreazioneA.Value:yyyy-MM-dd}'");
         
         var filterStr = string.Join(" and ", filterConditions);
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_PROJECT", filterStr, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROJECT", filterStr, sessionId);
         return sapData.Select(MapToProjectDto).ToList();
     }
 
     public async Task<List<LivelloProgettoDto>> GetLivelliAsync(string numeroProgetto, string sessionId)
     {
         var filter = $"U_Parent eq '{numeroProgetto}'";
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_PROJLVL", filter, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROJLVL", filter, sessionId);
         return sapData.Select(MapToLivelloDto).ToList();
     }
 
     public async Task<LivelloProgettoDto> CreateLivelloAsync(string numeroProgetto, LivelloProgettoDto livello, string sessionId)
     {
         var sapUDO = ProjectMapper.MapLivelloToSap(livello, numeroProgetto);
-        var result = await _sapClient.CreateRecordAsync<JsonElement>("@AX_ADT_PROJLVL", sapUDO, sessionId);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>("AX_ADT_PROJLVL", sapUDO, sessionId);
         return MapToLivelloDto(result);
     }
 
     public async Task DeleteLivelloAsync(string numeroProgetto, int livelloId, string sessionId)
     {
         var code = $"{numeroProgetto}-L{livelloId}";
-        await _sapClient.DeleteRecordAsync("@AX_ADT_PROJLVL", code, sessionId);
+        await _sapClient.DeleteRecordAsync("AX_ADT_PROJLVL", code, sessionId);
     }
 
     public async Task<List<ProdottoProgettoDto>> GetProdottiAsync(string numeroProgetto, string sessionId)
     {
         var filter = $"U_Parent eq '{numeroProgetto}'";
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_PROPRD", filter, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROPRD", filter, sessionId);
         return sapData.Select(MapToProdottoDto).ToList();
     }
 
     public async Task<ProdottoProgettoDto> CreateProdottoAsync(string numeroProgetto, ProdottoProgettoDto prodotto, string sessionId)
     {
         var sapUDO = ProjectMapper.MapProdottoToSap(prodotto, numeroProgetto);
-        var result = await _sapClient.CreateRecordAsync<JsonElement>("@AX_ADT_PROPRD", sapUDO, sessionId);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>("AX_ADT_PROPRD", sapUDO, sessionId);
         return MapToProdottoDto(result);
     }
 
     public async Task DeleteProdottoAsync(string numeroProgetto, int prodottoId, string sessionId)
     {
         var code = $"{numeroProgetto}-P{prodottoId}";
-        await _sapClient.DeleteRecordAsync("@AX_ADT_PROPRD", code, sessionId);
+        await _sapClient.DeleteRecordAsync("AX_ADT_PROPRD", code, sessionId);
     }
 
     public async Task<List<StoricoModificaDto>> GetStoricoAsync(string numeroProgetto, string sessionId)
     {
         var filter = $"U_Parent eq '{numeroProgetto}'";
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("@AX_ADT_PROHIST", filter, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROHIST", filter, sessionId);
         return sapData.Select(MapToStoricoDto).ToList();
     }
 
