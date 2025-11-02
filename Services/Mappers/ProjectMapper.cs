@@ -1,5 +1,4 @@
 using ADOTTA.Projects.Suite.Api.Models;
-using ADOTTA.Projects.Suite.Api.Models.Enums;
 using ADOTTA.Projects.Suite.Api.DTOs;
 using System.Text.Json;
 
@@ -26,7 +25,7 @@ public static class ProjectMapper
             U_DataFineInstall = dto.DataFineInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
             U_VersioneWIC = dto.VersioneWIC ?? "",
             U_UltimaModifica = dto.UltimaModifica?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss"),
-            U_StatoProgetto = dto.StatoProgetto.ToString(),
+            U_StatoProgetto = dto.StatoProgetto ?? "",
             U_ValoreProgetto = dto.ValoreProgetto ?? 0,
             U_MarginePrevisto = dto.MarginePrevisto ?? 0,
             U_CostiSostenuti = dto.CostiSostenuti ?? 0,
@@ -54,7 +53,7 @@ public static class ProjectMapper
             DataFineInstallazione = sapData.TryGetProperty("U_DataFineInstall", out var endDate) && DateTime.TryParse(endDate.GetString(), out var dtEnd) ? dtEnd : null,
             VersioneWIC = sapData.TryGetProperty("U_VersioneWIC", out var version) ? version.GetString() : null,
             UltimaModifica = sapData.TryGetProperty("U_UltimaModifica", out var lastMod) && DateTime.TryParse(lastMod.GetString(), out var dtMod) ? dtMod : null,
-            StatoProgetto = sapData.TryGetProperty("U_StatoProgetto", out var status) && Enum.TryParse(status.GetString(), out ProjectStatus ps) ? ps : ProjectStatus.ON_GOING,
+            StatoProgetto = sapData.TryGetProperty("U_StatoProgetto", out var status) ? status.GetString(): null,
             IsInRitardo = sapData.TryGetProperty("U_IsInRitardo", out var delay) && delay.GetString() == "Y",
             Note = sapData.TryGetProperty("U_Note", out var notes) ? notes.GetString() : null,
             ValoreProgetto = sapData.TryGetProperty("U_ValoreProgetto", out var value) ? value.GetDecimal() : null,

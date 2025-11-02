@@ -1,5 +1,4 @@
 using ADOTTA.Projects.Suite.Api.DTOs;
-using ADOTTA.Projects.Suite.Api.Models.Enums;
 using FluentValidation;
 
 namespace ADOTTA.Projects.Suite.Api.Validators;

@@ -1,6 +1,8 @@
+using ADOTTA.Projects.Suite.Api.Configuration;
 using ADOTTA.Projects.Suite.Api.DTOs;
 using ADOTTA.Projects.Suite.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace ADOTTA.Projects.Suite.Api.Controllers;
 
@@ -10,11 +12,13 @@ public class AuthController : ControllerBase
 {
     private readonly ISAPServiceLayerClient _sapClient;
     private readonly ILogger<AuthController> _logger;
+    private readonly SAPSettings _sapSettings;
 
-    public AuthController(ISAPServiceLayerClient sapClient, ILogger<AuthController> logger)
+    public AuthController(ISAPServiceLayerClient sapClient, ILogger<AuthController> logger, IOptions<SAPSettings> sapSettings)
     {
         _sapClient = sapClient;
         _logger = logger;
+        _sapSettings = sapSettings.Value;
     }
 
     [HttpPost("login")]
@@ -22,9 +26,14 @@ public class AuthController : ControllerBase
     {
         try
         {
+            // Se CompanyDB non è fornito, usa quello dalla configurazione
+            var companyDB = string.IsNullOrWhiteSpace(request.CompanyDB) 
+                ? _sapSettings.CompanyDB 
+                : request.CompanyDB;
+
             var loginRequest = new LoginRequest
             {
-                CompanyDB = request.CompanyDB,
+                CompanyDB = companyDB,
                 UserName = request.UserName,
                 Password = request.Password
             };

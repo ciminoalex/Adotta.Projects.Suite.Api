@@ -2,6 +2,8 @@ using ADOTTA.Projects.Suite.Api.DTOs;
 using ADOTTA.Projects.Suite.Api.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using System.Linq;
 
 namespace ADOTTA.Projects.Suite.Api.Controllers;
 
@@ -11,11 +13,13 @@ public class ProjectsController : ControllerBase
 {
     private readonly IProjectService _projectService;
     private readonly ILogger<ProjectsController> _logger;
+    private readonly IServiceProvider _serviceProvider;
 
-    public ProjectsController(IProjectService projectService, ILogger<ProjectsController> logger)
+    public ProjectsController(IProjectService projectService, ILogger<ProjectsController> logger, IServiceProvider serviceProvider)
     {
         _projectService = projectService;
         _logger = logger;
+        _serviceProvider = serviceProvider;
     }
 
     private string GetSessionId()
@@ -62,6 +66,25 @@ public class ProjectsController : ControllerBase
     {
         try
         {
+            // Validate the project DTO
+            var validator = _serviceProvider.GetRequiredService<IValidator<ProjectDto>>();
+            var validationResult = await validator.ValidateAsync(project);
+            if (!validationResult.IsValid)
+            {
+                // Convert PascalCase property names to camelCase for the error response
+                var errors = validationResult.Errors.GroupBy(e => e.PropertyName)
+                    .ToDictionary(
+                        g => System.Text.Json.JsonNamingPolicy.CamelCase.ConvertName(g.Key) ?? g.Key,
+                        g => g.Select(e => e.ErrorMessage).ToArray()
+                    );
+                return BadRequest(new { 
+                    type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+                    title = "One or more validation errors occurred.",
+                    status = 400,
+                    errors = errors
+                });
+            }
+
             var created = await _projectService.CreateProjectAsync(project, GetSessionId());
             return CreatedAtAction(nameof(GetByCode), new { numeroProgetto = created.NumeroProgetto }, created);
         }

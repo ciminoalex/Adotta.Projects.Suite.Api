@@ -72,7 +72,7 @@ public class ProjectService : IProjectService
     {
         var filterConditions = new List<string>();
         
-        if (filter.Stato.HasValue)
+        if (!string.IsNullOrEmpty(filter.Stato))
             filterConditions.Add($"U_StatoProgetto eq '{filter.Stato}'");
         
         if (!string.IsNullOrEmpty(filter.Cliente))
@@ -168,7 +168,7 @@ public class ProjectService : IProjectService
         
         return new ProjectStatsDto
         {
-            ProgettiAttivi = allProjects.Count(p => p.StatoProgetto.ToString() == "ON_GOING"),
+            ProgettiAttivi = allProjects.Count(p => (p.StatoProgetto??"").ToString() == "ON_GOING"),
             ValorePortfolio = allProjects.Sum(p => p.ValoreProgetto ?? 0),
             InstallazioniMese = allProjects.Count(p => p.DataInizioInstallazione?.Month == DateTime.Now.Month),
             ProgettiRitardo = allProjects.Count(p => p.IsInRitardo)
@@ -180,7 +180,7 @@ public class ProjectService : IProjectService
         var allProjects = await GetAllProjectsAsync(sessionId);
         
         return allProjects
-            .GroupBy(p => p.StatoProgetto.ToString())
+            .GroupBy(p => (p.StatoProgetto??"").ToString())
             .Select(g => new ProjectStatsByStatusDto
             {
                 Stato = g.Key,

@@ -1,10 +1,8 @@
-using ADOTTA.Projects.Suite.Api.Models.Enums;
-
 namespace ADOTTA.Projects.Suite.Api.DTOs;
 
 public class FilterRequestDto
 {
-    public ProjectStatus? Stato { get; set; }
+    public string? Stato { get; set; }
     public string? Cliente { get; set; }
     public string? ProjectManager { get; set; }
     public string? TeamTecnico { get; set; }

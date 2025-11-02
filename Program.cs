@@ -3,6 +3,7 @@ using ADOTTA.Projects.Suite.Api.Middleware;
 using ADOTTA.Projects.Suite.Api.Services;
 using ADOTTA.Projects.Suite.Api.Validators;
 using FluentValidation;
+using FluentValidation.AspNetCore;
 using Serilog;
 using Microsoft.OpenApi.Models;
 
@@ -13,7 +14,13 @@ builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
 
 // Add services to the container
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        // Use enum as string with exact name matching (ON_GOING, CRITICAL, etc.)
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
