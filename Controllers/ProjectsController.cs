@@ -245,21 +245,6 @@ public class ProjectsController : ControllerBase
         }
     }
 
-    [HttpGet("{numeroProgetto}/storico")]
-    public async Task<ActionResult<List<StoricoModificaDto>>> GetStorico(string numeroProgetto)
-    {
-        try
-        {
-            var storico = await _projectService.GetStoricoAsync(numeroProgetto, GetSessionId());
-            return Ok(storico);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting storico for project: {NumeroProgetto}", numeroProgetto);
-            return StatusCode(500, new { message = "Error retrieving storico", error = ex.Message });
-        }
-    }
-
     [HttpPost("{numeroProgetto}/wic-snapshot")]
     public async Task<ActionResult<List<StoricoModificaDto>>> CreateWicSnapshot(string numeroProgetto)
     {

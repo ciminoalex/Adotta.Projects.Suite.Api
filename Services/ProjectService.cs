@@ -28,11 +28,8 @@ public class ProjectService : IProjectService
             var sapData = await _sapClient.GetRecordAsync<JsonElement>("AX_ADT_PROJECT", numeroProgetto, sessionId);
             if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
             
+            // Child tables are included in the response, no need for separate calls
             var project = ProjectMapper.MapSapUDOToProject(sapData);
-            
-            // Load related data
-            project.Livelli = await GetLivelliAsync(numeroProgetto, sessionId);
-            project.Prodotti = await GetProdottiAsync(numeroProgetto, sessionId);
             
             return project;
         }
@@ -94,49 +91,65 @@ public class ProjectService : IProjectService
 
     public async Task<List<LivelloProgettoDto>> GetLivelliAsync(string numeroProgetto, string sessionId)
     {
-        var filter = $"U_Parent eq '{numeroProgetto}'";
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROJLVL", filter, sessionId);
-        return sapData.Select(MapToLivelloDto).ToList();
+        // Child tables can only be retrieved through parent project
+        var project = await GetProjectByCodeAsync(numeroProgetto, sessionId);
+        return project?.Livelli ?? new List<LivelloProgettoDto>();
+    }
+
+    public async Task<List<ProdottoProgettoDto>> GetProdottiAsync(string numeroProgetto, string sessionId)
+    {
+        // Child tables can only be retrieved through parent project
+        var project = await GetProjectByCodeAsync(numeroProgetto, sessionId);
+        return project?.Prodotti ?? new List<ProdottoProgettoDto>();
+    }
+
+    public async Task<List<StoricoModificaDto>> GetStoricoAsync(string numeroProgetto, string sessionId)
+    {
+        // Child tables can only be retrieved through parent project
+        var project = await GetProjectByCodeAsync(numeroProgetto, sessionId);
+        if (project == null) return new List<StoricoModificaDto>();
+        
+        // Extract storico from the project response
+        var sapData = await _sapClient.GetRecordAsync<JsonElement>("AX_ADT_PROJECT", numeroProgetto, sessionId);
+        if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null)
+            return new List<StoricoModificaDto>();
+        
+        var storico = new List<StoricoModificaDto>();
+        if (sapData.TryGetProperty("AX_ADT_PROHISTCollection", out var storicoArray) && storicoArray.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in storicoArray.EnumerateArray())
+            {
+                storico.Add(MapToStoricoDto(item));
+            }
+        }
+        
+        return storico;
     }
 
     public async Task<LivelloProgettoDto> CreateLivelloAsync(string numeroProgetto, LivelloProgettoDto livello, string sessionId)
     {
         var sapUDO = ProjectMapper.MapLivelloToSap(livello, numeroProgetto);
-        var result = await _sapClient.CreateRecordAsync<JsonElement>("AX_ADT_PROJLVL", sapUDO, sessionId);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>("@AX_ADT_PROJLVL", sapUDO, sessionId);
         return MapToLivelloDto(result);
     }
 
     public async Task DeleteLivelloAsync(string numeroProgetto, int livelloId, string sessionId)
     {
         var code = $"{numeroProgetto}-L{livelloId}";
-        await _sapClient.DeleteRecordAsync("AX_ADT_PROJLVL", code, sessionId);
-    }
-
-    public async Task<List<ProdottoProgettoDto>> GetProdottiAsync(string numeroProgetto, string sessionId)
-    {
-        var filter = $"U_Parent eq '{numeroProgetto}'";
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROPRD", filter, sessionId);
-        return sapData.Select(MapToProdottoDto).ToList();
+        await _sapClient.DeleteRecordAsync("@AX_ADT_PROJLVL", code, sessionId);
     }
 
     public async Task<ProdottoProgettoDto> CreateProdottoAsync(string numeroProgetto, ProdottoProgettoDto prodotto, string sessionId)
     {
         var sapUDO = ProjectMapper.MapProdottoToSap(prodotto, numeroProgetto);
-        var result = await _sapClient.CreateRecordAsync<JsonElement>("AX_ADT_PROPRD", sapUDO, sessionId);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>("@AX_ADT_PROPRD", sapUDO, sessionId);
         return MapToProdottoDto(result);
     }
 
     public async Task DeleteProdottoAsync(string numeroProgetto, int prodottoId, string sessionId)
     {
         var code = $"{numeroProgetto}-P{prodottoId}";
-        await _sapClient.DeleteRecordAsync("AX_ADT_PROPRD", code, sessionId);
-    }
-
-    public async Task<List<StoricoModificaDto>> GetStoricoAsync(string numeroProgetto, string sessionId)
-    {
-        var filter = $"U_Parent eq '{numeroProgetto}'";
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROHIST", filter, sessionId);
-        return sapData.Select(MapToStoricoDto).ToList();
+        await _sapClient.DeleteRecordAsync("@AX_ADT_PROPRD", code, sessionId);
     }
 
     public async Task<List<StoricoModificaDto>> CreateWicSnapshotAsync(string numeroProgetto, string sessionId)
@@ -168,7 +181,7 @@ public class ProjectService : IProjectService
         
         return new ProjectStatsDto
         {
-            ProgettiAttivi = allProjects.Count(p => (p.StatoProgetto??"").ToString() == "ON_GOING"),
+            ProgettiAttivi = allProjects.Count(p => p.StatoProgetto == Models.Enums.ProjectStatus.ON_GOING),
             ValorePortfolio = allProjects.Sum(p => p.ValoreProgetto ?? 0),
             InstallazioniMese = allProjects.Count(p => p.DataInizioInstallazione?.Month == DateTime.Now.Month),
             ProgettiRitardo = allProjects.Count(p => p.IsInRitardo)
@@ -180,7 +193,7 @@ public class ProjectService : IProjectService
         var allProjects = await GetAllProjectsAsync(sessionId);
         
         return allProjects
-            .GroupBy(p => (p.StatoProgetto??"").ToString())
+            .GroupBy(p => p.StatoProgetto.ToString())
             .Select(g => new ProjectStatsByStatusDto
             {
                 Stato = g.Key,

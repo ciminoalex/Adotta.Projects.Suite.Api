@@ -1,3 +1,5 @@
+using ADOTTA.Projects.Suite.Api.Models.Enums;
+
 namespace ADOTTA.Projects.Suite.Api.DTOs;
 
 public class ProjectDto
@@ -17,7 +19,7 @@ public class ProjectDto
     public DateTime? DataFineInstallazione { get; set; }
     public string? VersioneWIC { get; set; }
     public DateTime? UltimaModifica { get; set; }
-    public string? StatoProgetto { get; set; }
+    public ProjectStatus StatoProgetto { get; set; }
     public bool IsInRitardo { get; set; }
     public string? Note { get; set; }
     public decimal? ValoreProgetto { get; set; }

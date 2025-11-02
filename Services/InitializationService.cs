@@ -101,6 +101,8 @@ public class InitializationService : IInitializationService
             ("@AX_ADT_PROJECT", new { Name = "MarginePrevisto", Type = "db_Float", Description = "Margine Previsto", TableName = "@AX_ADT_PROJECT", SubType = "st_Percentage" }),
             ("@AX_ADT_PROJECT", new { Name = "CostiSostenuti", Type = "db_Float", Description = "Costi Sostenuti", TableName = "@AX_ADT_PROJECT", SubType = "st_Sum" }),
             ("@AX_ADT_PROJECT", new { Name = "IsInRitardo", Type = "db_Alpha", Size = 1, Description = "In Ritardo (Y/N)", TableName = "@AX_ADT_PROJECT", EditSize = 1, SubType = "st_None" }),
+            ("@AX_ADT_PROJECT", new { Name = "Note", Type = "db_Memo", Description = "Note", TableName = "@AX_ADT_PROJECT" }),
+            ("@AX_ADT_PROJECT", new { Name = "UltimaModifica", Type = "db_Date", Description = "Ultima Modifica", TableName = "@AX_ADT_PROJECT" }),
 
             ("@AX_ADT_PROJLVL", new { Name = "Parent", Type = "db_Alpha", Size = 30, Description = "Numero Progetto", TableName = "@AX_ADT_PROJLVL", EditSize = 30, SubType = "st_None" }),
             ("@AX_ADT_PROJLVL", new { Name = "Ordine", Type = "db_Numeric", Description = "Ordine", TableName = "@AX_ADT_PROJLVL" }),
