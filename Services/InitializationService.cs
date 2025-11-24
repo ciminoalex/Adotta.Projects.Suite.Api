@@ -48,7 +48,8 @@ public class InitializationService : IInitializationService
             new { Name = "AX_ADT_SALES", Description = "Adt Prjs: Sales", Type = "bott_MasterData" },
             new { Name = "AX_ADT_PMGR", Description = "Adt Prjs: PM", Type = "bott_MasterData" },
             new { Name = "AX_ADT_SQUADRA", Description = "Adt Prjs: Squadre Install", Type = "bott_MasterData" },
-            new { Name = "AX_ADT_PRODMAST", Description = "Adt Prjs: Prodotti Master", Type = "bott_MasterData" }
+            new { Name = "AX_ADT_PRODMAST", Description = "Adt Prjs: Prodotti Master", Type = "bott_MasterData" },
+            new { Name = "AX_ADT_TIMESHEET", Description = "Adt Prjs: Timesheet", Type = "bott_Document" }
         };
 
         foreach (var t in tables)
@@ -123,7 +124,18 @@ public class InitializationService : IInitializationService
             ("@AX_ADT_PROHIST", new { Name = "CampoModificato", Type = "db_Alpha", Size = 100, Description = "Campo Modificato", TableName = "@AX_ADT_PROHIST", EditSize = 100, SubType = "st_None" }),
             ("@AX_ADT_PROHIST", new { Name = "ValorePrecedente", Type = "db_Memo", Description = "Valore Precedente", TableName = "@AX_ADT_PROHIST" }),
             ("@AX_ADT_PROHIST", new { Name = "NuovoValore", Type = "db_Memo", Description = "Nuovo Valore", TableName = "@AX_ADT_PROHIST" }),
-            ("@AX_ADT_PROHIST", new { Name = "VersioneWIC", Type = "db_Alpha", Size = 20, Description = "Versione WIC", TableName = "@AX_ADT_PROHIST", EditSize = 20, SubType = "st_None" })
+            ("@AX_ADT_PROHIST", new { Name = "VersioneWIC", Type = "db_Alpha", Size = 20, Description = "Versione WIC", TableName = "@AX_ADT_PROHIST", EditSize = 20, SubType = "st_None" }),
+
+            ("@AX_ADT_TIMESHEET", new { Name = "Progetto", Type = "db_Alpha", Size = 30, Description = "ID Progetto", TableName = "@AX_ADT_TIMESHEET", EditSize = 30, SubType = "st_None" }),
+            ("@AX_ADT_TIMESHEET", new { Name = "NumeroProgetto", Type = "db_Alpha", Size = 30, Description = "Numero Progetto", TableName = "@AX_ADT_TIMESHEET", EditSize = 30, SubType = "st_None" }),
+            ("@AX_ADT_TIMESHEET", new { Name = "NomeProgetto", Type = "db_Alpha", Size = 100, Description = "Nome Progetto", TableName = "@AX_ADT_TIMESHEET", EditSize = 100, SubType = "st_None" }),
+            ("@AX_ADT_TIMESHEET", new { Name = "Cliente", Type = "db_Alpha", Size = 50, Description = "Cliente", TableName = "@AX_ADT_TIMESHEET", EditSize = 50, SubType = "st_None" }),
+            ("@AX_ADT_TIMESHEET", new { Name = "DataRendicontazione", Type = "db_Date", Description = "Data Rendicontazione", TableName = "@AX_ADT_TIMESHEET" }),
+            ("@AX_ADT_TIMESHEET", new { Name = "OreLavorate", Type = "db_Float", Description = "Ore Lavorate", TableName = "@AX_ADT_TIMESHEET", SubType = "st_Quantity" }),
+            ("@AX_ADT_TIMESHEET", new { Name = "Note", Type = "db_Memo", Description = "Note", TableName = "@AX_ADT_TIMESHEET" }),
+            ("@AX_ADT_TIMESHEET", new { Name = "Utente", Type = "db_Alpha", Size = 50, Description = "Utente", TableName = "@AX_ADT_TIMESHEET", EditSize = 50, SubType = "st_None" }),
+            ("@AX_ADT_TIMESHEET", new { Name = "DataCreazione", Type = "db_Date", Description = "Data Creazione", TableName = "@AX_ADT_TIMESHEET" }),
+            ("@AX_ADT_TIMESHEET", new { Name = "UltimaModifica", Type = "db_Date", Description = "Ultima Modifica", TableName = "@AX_ADT_TIMESHEET" })
         };
 
         foreach (var (table, field) in fields)
@@ -161,7 +173,7 @@ public class InitializationService : IInitializationService
                 Code = udoCode,
                 Name = "Adt Prjs: Progetti",
                 ObjectType = "boud_MasterData",
-                TableName = "@AX_ADT_PROJECT",
+                TableName = "AX_ADT_PROJECT", // TableName senza prefisso "@" - SAP lo aggiunge automaticamente
                 CanCreateDefaultForm = "tYES",
                 CanCancel = "tNO",
                 CanDelete = "tYES",
@@ -169,14 +181,9 @@ public class InitializationService : IInitializationService
                 ManageSeries = "tNO",
                 UserObjectMD_ChildTables = new[]
                 {
-                    new { ObjectName = "AX_ADT_PROJLVL", TableName = "@AX_ADT_PROJLVL" },
-                    new { ObjectName = "AX_ADT_PROPRD", TableName = "@AX_ADT_PROPRD" },
-                    new { ObjectName = "AX_ADT_PROHIST", TableName = "@AX_ADT_PROHIST" }
-                },
-                FindColumns = new[]
-                {
-                    new { ColumnAlias = "Code", ColumnDescription = "Numero Progetto" },
-                    new { ColumnAlias = "Name", ColumnDescription = "Nome Progetto" }
+                    new { ObjectName = "AX_ADT_PROJLVL", TableName = "AX_ADT_PROJLVL" }, // TableName senza prefisso "@"
+                    new { ObjectName = "AX_ADT_PROPRD", TableName = "AX_ADT_PROPRD" }, // TableName senza prefisso "@"
+                    new { ObjectName = "AX_ADT_PROHIST", TableName = "AX_ADT_PROHIST" } // TableName senza prefisso "@"
                 }
             };
 
@@ -198,14 +205,15 @@ public class InitializationService : IInitializationService
         // Register UDOs for master data tables (no child tables)
         var otherUdos = new[]
         {
-            new { Code = "AX_ADT_STATI", Name = "Adt Prjs: Stati" },
-            new { Code = "AX_ADT_CITTA", Name = "Adt Prjs: Città" },
-            new { Code = "AX_ADT_TEAMTECH", Name = "Adt Prjs: Team Tech" },
-            new { Code = "AX_ADT_TEAMAPL", Name = "Adt Prjs: Team APL" },
-            new { Code = "AX_ADT_SALES", Name = "Adt Prjs: Sales" },
-            new { Code = "AX_ADT_PMGR", Name = "Adt Prjs: PM" },
-            new { Code = "AX_ADT_SQUADRA", Name = "Adt Prjs: Squadre Install" },
-            new { Code = "AX_ADT_PRODMAST", Name = "Adt Prjs: Prod. Master" }
+            new { Code = "AX_ADT_STATI", Name = "Adt Prjs: Stati", ObjectType = (string?)null },
+            new { Code = "AX_ADT_CITTA", Name = "Adt Prjs: Città", ObjectType = (string?)null },
+            new { Code = "AX_ADT_TEAMTECH", Name = "Adt Prjs: Team Tech", ObjectType = (string?)null },
+            new { Code = "AX_ADT_TEAMAPL", Name = "Adt Prjs: Team APL", ObjectType = (string?)null },
+            new { Code = "AX_ADT_SALES", Name = "Adt Prjs: Sales", ObjectType = (string?)null },
+            new { Code = "AX_ADT_PMGR", Name = "Adt Prjs: PM", ObjectType = (string?)null },
+            new { Code = "AX_ADT_SQUADRA", Name = "Adt Prjs: Squadre Install", ObjectType = (string?)null },
+            new { Code = "AX_ADT_PRODMAST", Name = "Adt Prjs: Prod. Master", ObjectType = (string?)null },
+            new { Code = "AX_ADT_TIMESHEET", Name = "Adt Prjs: Timesheet", ObjectType = (string?)"boud_Document" }
         };
 
         foreach (var u in otherUdos)
@@ -213,22 +221,18 @@ public class InitializationService : IInitializationService
             var existsUdo = await UdoExistsAsync(u.Code, sessionId);
             if (!existsUdo)
             {
+                var objectType = u.ObjectType ?? "boud_MasterData";
                 var payloadUdo = new
                 {
                     Code = u.Code,
                     Name = u.Name,
-                    ObjectType = "boud_MasterData",
-                    TableName = $"@{u.Code}",
+                    ObjectType = objectType,
+                    TableName = u.Code, // TableName senza prefisso "@" - SAP lo aggiunge automaticamente
                     CanCreateDefaultForm = "tYES",
                     CanCancel = "tNO",
                     CanDelete = "tYES",
                     CanClose = "tNO",
-                    ManageSeries = "tNO",
-                    FindColumns = new[]
-                    {
-                        new { ColumnAlias = "Code", ColumnDescription = "Codice" },
-                        new { ColumnAlias = "Name", ColumnDescription = "Descrizione" }
-                    }
+                    ManageSeries = "tNO"
                 };
 
                 try

@@ -16,42 +16,47 @@ public class TimesheetService : ITimesheetService
 
     public async Task<List<TimesheetEntryDto>> GetAllEntriesAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("TIMESHEET", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_TIMESHEET", null, sessionId);
         return sapData.Select(MapToTimesheetDto).ToList();
     }
 
     public async Task<TimesheetEntryDto?> GetEntryByIdAsync(int id, string sessionId)
     {
-        var filter = $"Code eq '{id}'";
-        var entries = await _sapClient.GetRecordsAsync<JsonElement>("TIMESHEET", filter, sessionId);
-        var entry = entries.FirstOrDefault();
-        if (entry.ValueKind == JsonValueKind.Undefined) return null;
-        return MapToTimesheetDto(entry);
+        try
+        {
+            var entry = await _sapClient.GetRecordAsync<JsonElement>("AX_ADT_TIMESHEET", id.ToString(), sessionId);
+            if (entry.ValueKind == JsonValueKind.Undefined || entry.ValueKind == JsonValueKind.Null) return null;
+            return MapToTimesheetDto(entry);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public async Task<TimesheetEntryDto> CreateEntryAsync(TimesheetEntryDto entry, string sessionId)
     {
         var sapData = MapTimesheetToSap(entry);
-        var result = await _sapClient.CreateRecordAsync<JsonElement>("TIMESHEET", sapData, sessionId);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>("AX_ADT_TIMESHEET", sapData, sessionId);
         return MapToTimesheetDto(result);
     }
 
     public async Task<TimesheetEntryDto> UpdateEntryAsync(int id, TimesheetEntryDto entry, string sessionId)
     {
         var sapData = MapTimesheetToSap(entry);
-        var result = await _sapClient.UpdateRecordAsync<JsonElement>("TIMESHEET", id.ToString(), sapData, sessionId);
+        var result = await _sapClient.UpdateRecordAsync<JsonElement>("AX_ADT_TIMESHEET", id.ToString(), sapData, sessionId);
         return MapToTimesheetDto(result);
     }
 
     public async Task DeleteEntryAsync(int id, string sessionId)
     {
-        await _sapClient.DeleteRecordAsync("TIMESHEET", id.ToString(), sessionId);
+        await _sapClient.DeleteRecordAsync("AX_ADT_TIMESHEET", id.ToString(), sessionId);
     }
 
     public async Task<List<TimesheetEntryDto>> GetEntriesByProjectAsync(string numeroProgetto, string sessionId)
     {
         var filter = $"U_Progetto eq '{numeroProgetto}'";
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("TIMESHEET", filter, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_TIMESHEET", filter, sessionId);
         return sapData.Select(MapToTimesheetDto).ToList();
     }
 
@@ -137,7 +142,7 @@ public class TimesheetService : ITimesheetService
     public async Task<List<TimesheetEntryDto>> GetEntriesByUserAsync(string utente, string sessionId)
     {
         var filter = $"U_Utente eq '{utente}'";
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("TIMESHEET", filter, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_TIMESHEET", filter, sessionId);
         return sapData.Select(MapToTimesheetDto).ToList();
     }
 

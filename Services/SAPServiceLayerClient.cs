@@ -353,8 +353,8 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
                 _logger.LogError("SAP POST {Url} failed. Status: {Status}. Body: {Body}", url, response.StatusCode, errorBody);
+                throw new HttpRequestException($"SAP POST {url} failed. Status: {response.StatusCode}. Body: {errorBody}");
             }
-            response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<T>();
             return result!;
