@@ -36,7 +36,7 @@ public class JwtTokenService : IJwtTokenService
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-            new(JwtRegisteredClaimNames.UniqueName, user.Username ?? string.Empty),
+            new(JwtRegisteredClaimNames.UniqueName, user.UserCode ?? string.Empty),
             new(ClaimTypes.Name, user.UserName ?? string.Empty),
             new(ClaimTypes.Role, user.Ruolo ?? string.Empty),
             new(SapClaimTypes.SessionId, sapSessionId),

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Linq;
 
 namespace ADOTTA.Projects.Suite.Api.Services;
 
@@ -30,6 +31,9 @@ public class InitializationService : IInitializationService
         // 4) Custom Queries (none for now)
         steps.Add("Custom queries: none");
 
+        // 5) Seed default admin user
+        await EnsureDefaultAdminUserAsync(sessionId, steps, warnings);
+
         return new InitializationResult { Steps = steps, Warnings = warnings };
     }
 
@@ -51,7 +55,7 @@ public class InitializationService : IInitializationService
             new { Name = "AX_ADT_PMGR", Description = "Adt Prjs: PM", Type = "bott_MasterData" },
             new { Name = "AX_ADT_SQUADRA", Description = "Adt Prjs: Squadre Install", Type = "bott_MasterData" },
             new { Name = "AX_ADT_PRODMAST", Description = "Adt Prjs: Prodotti Master", Type = "bott_MasterData" },
-            new { Name = "AX_ADT_TIMESHEET", Description = "Adt Prjs: Timesheet", Type = "bott_Document" },
+            new { Name = "AX_ADT_TIMESHEET", Description = "Adt Prjs: Timesheet", Type = "bott_MasterData" },
             new { Name = "AX_ADT_USERS", Description = "Adt Prjs: Users", Type = "bott_MasterData" }
         };
 
@@ -227,9 +231,7 @@ public class InitializationService : IInitializationService
             new { Code = "AX_ADT_PMGR", Name = "Adt Prjs: PM", ObjectType = (string?)null },
             new { Code = "AX_ADT_SQUADRA", Name = "Adt Prjs: Squadre Install", ObjectType = (string?)null },
             new { Code = "AX_ADT_PRODMAST", Name = "Adt Prjs: Prod. Master", ObjectType = (string?)null },
-            new { Code = "AX_ADT_TIMESHEET", Name = "Adt Prjs: Timesheet", ObjectType = (string?)"boud_Document" },
-            new { Code = "AX_ADT_PROMSG", Name = "Adt Prjs: Messaggi", ObjectType = (string?)"boud_DocumentLines" },
-            new { Code = "AX_ADT_PROCHG", Name = "Adt Prjs: ChangeLog", ObjectType = (string?)"boud_DocumentLines" },
+            new { Code = "AX_ADT_TIMESHEET", Name = "Adt Prjs: Timesheet", ObjectType = (string?)null },
             new { Code = "AX_ADT_USERS", Name = "Adt Prjs: Users", ObjectType = (string?)null }
         };
 
@@ -271,20 +273,18 @@ public class InitializationService : IInitializationService
         var exists = await UdoExistsAsync(code, sessionId);
         try
         {
-            if (!exists)
+            if (exists)
             {
-                await _sapClient.CreateRecordAsync<JsonElement>("UserObjectsMD", payload, sessionId);
-                steps.Add($"UDO created: {code}");
+                steps.Add($"UDO already exists: {code}");
+                return;
             }
-            else
-            {
-                await _sapClient.UpdateRecordAsync<JsonElement>("UserObjectsMD", code, payload, sessionId);
-                steps.Add($"UDO updated: {code}");
-            }
+
+            await _sapClient.CreateRecordAsync<JsonElement>("UserObjectsMD", payload, sessionId);
+            steps.Add($"UDO created: {code}");
         }
         catch (Exception ex)
         {
-            warnings.Add($"UDO {(exists ? "update" : "create")} failed {code}: {ex.Message}");
+            warnings.Add($"UDO create failed {code}: {ex.Message}");
         }
     }
 
@@ -311,6 +311,44 @@ public class InitializationService : IInitializationService
         catch
         {
             return false;
+        }
+    }
+
+    private async Task EnsureDefaultAdminUserAsync(string sessionId, List<string> steps, List<string> warnings)
+    {
+        const string adminEmail = "admin@admin.me";
+        const string defaultPassword = "123456789";
+
+        try
+        {
+            var safeEmail = adminEmail.Replace("'", "''");
+            var filter = $"U_Email eq '{safeEmail}'";
+            var existing = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_USERS", filter, sessionId);
+
+            if (existing.Any())
+            {
+                steps.Add("Default admin user already present");
+                return;
+            }
+
+            var payload = new Dictionary<string, object?>
+            {
+                ["Code"] = "ADMIN",
+                ["Name"] = "Administrator",
+                ["U_Username"] = "admin",
+                ["U_Email"] = adminEmail,
+                ["U_Ruolo"] = "ADMIN",
+                ["U_TeamTecnico"] = null,
+                ["U_IsActive"] = "Y",
+                ["U_Password"] = defaultPassword
+            };
+
+            await _sapClient.CreateRecordAsync<JsonElement>("AX_ADT_USERS", payload, sessionId);
+            steps.Add("Default admin user created (admin@admin.me)");
+        }
+        catch (Exception ex)
+        {
+            warnings.Add($"Default admin user creation failed: {ex.Message}");
         }
     }
 }

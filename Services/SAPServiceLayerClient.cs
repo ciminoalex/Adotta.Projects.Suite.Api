@@ -395,6 +395,13 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
             }
             response.EnsureSuccessStatusCode();
 
+            if (response.StatusCode == System.Net.HttpStatusCode.NoContent ||
+                response.Content == null ||
+                response.Content.Headers.ContentLength == 0)
+            {
+                return default!;
+            }
+
             var result = await response.Content.ReadFromJsonAsync<T>();
             return result!;
         }

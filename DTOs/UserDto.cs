@@ -1,9 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace ADOTTA.Projects.Suite.Api.DTOs;
 
 public class UserDto
 {
     public int Id { get; set; }
-    public string Username { get; set; } = string.Empty;
+    public string UserCode { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
     public string Ruolo { get; set; } = string.Empty;

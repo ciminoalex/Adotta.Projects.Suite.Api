@@ -55,10 +55,16 @@ public class UserService : IUserService
         }
 
         var safeEmail = email.Replace("'", "''");
-        var filter = $"tolower(U_Email) eq '{safeEmail.ToLowerInvariant()}'";
+        var filter = $"U_Email eq '{safeEmail}'";
         var sapData = await _sapClient.GetRecordsAsync<JsonElement>(TableName, filter, sessionId);
         var first = sapData.FirstOrDefault();
-        return first.ValueKind == JsonValueKind.Undefined ? null : MapToUserDto(first, includeSensitive);
+        if (first.ValueKind == JsonValueKind.Undefined || first.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        var user = MapToUserDto(first, includeSensitive);
+        return string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase) ? user : null;
     }
 
     public async Task<UserDto> CreateUserAsync(UserDto user, string sessionId)
@@ -88,7 +94,7 @@ public class UserService : IUserService
             Id = record.TryGetProperty("Code", out var codeProp) && int.TryParse(codeProp.GetString(), out var code)
                 ? code
                 : 0,
-            Username = record.TryGetProperty("U_Username", out var username) ? username.GetString() ?? string.Empty : string.Empty,
+            UserCode = record.TryGetProperty("U_Username", out var username) ? username.GetString() ?? string.Empty : string.Empty,
             Email = record.TryGetProperty("U_Email", out var email) ? email.GetString() ?? string.Empty : string.Empty,
             UserName = record.TryGetProperty("Name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
             Ruolo = record.TryGetProperty("U_Ruolo", out var role) ? role.GetString() ?? string.Empty : string.Empty,
@@ -109,7 +115,7 @@ public class UserService : IUserService
         {
             ["Code"] = isUpdate ? user.Id.ToString() : code,
             ["Name"] = user.UserName,
-            ["U_Username"] = user.Username,
+            ["U_Username"] = user.UserCode,
             ["U_Email"] = user.Email,
             ["U_Ruolo"] = user.Ruolo,
             ["U_TeamTecnico"] = user.TeamTecnico,
