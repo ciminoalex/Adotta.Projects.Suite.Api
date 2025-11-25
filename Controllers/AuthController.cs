@@ -11,15 +11,23 @@ namespace ADOTTA.Projects.Suite.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly ISAPServiceLayerClient _sapClient;
+    private readonly IUserService _userService;
     private readonly ILogger<AuthController> _logger;
     private readonly SAPSettings _sapSettings;
 
-    public AuthController(ISAPServiceLayerClient sapClient, ILogger<AuthController> logger, IOptions<SAPSettings> sapSettings)
+    public AuthController(
+        ISAPServiceLayerClient sapClient,
+        IUserService userService,
+        ILogger<AuthController> logger,
+        IOptions<SAPSettings> sapSettings)
     {
         _sapClient = sapClient;
+        _userService = userService;
         _logger = logger;
         _sapSettings = sapSettings.Value;
     }
+
+    private string GetSessionId() => Request.Headers["X-SAP-Session-Id"].ToString() ?? string.Empty;
 
     [HttpPost("login")]
     public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginRequestDto request)
@@ -39,6 +47,11 @@ public class AuthController : ControllerBase
             };
 
             var response = await _sapClient.LoginAsync(loginRequest);
+
+            if (!string.IsNullOrWhiteSpace(response.SessionId))
+            {
+                Response.Headers["X-SAP-Session-Id"] = response.SessionId;
+            }
             
             return Ok(new LoginResponseDto
             {
@@ -71,6 +84,31 @@ public class AuthController : ControllerBase
         {
             _logger.LogError(ex, "Error during logout");
             return StatusCode(500, new { message = "Logout failed", error = ex.Message });
+        }
+    }
+
+    [HttpGet("users/by-email/{email}")]
+    public async Task<ActionResult<UserDto>> GetUserByEmail(string email)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return BadRequest(new { message = "Email is required" });
+            }
+
+            var user = await _userService.GetUserByEmailAsync(email, GetSessionId());
+            if (user == null)
+            {
+                return NotFound(new { message = $"User with email '{email}' not found" });
+            }
+
+            return Ok(user);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving user by email {Email}", email);
+            return StatusCode(500, new { message = "Error retrieving user", error = ex.Message });
         }
     }
 }

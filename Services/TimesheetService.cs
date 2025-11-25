@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 using ADOTTA.Projects.Suite.Api.DTOs;
 
@@ -155,6 +156,9 @@ public class TimesheetService : ITimesheetService
             NumeroProgetto = sapData.TryGetProperty("U_NumeroProgetto", out var num) ? num.GetString() ?? "" : "",
             NomeProgetto = sapData.TryGetProperty("U_NomeProgetto", out var name) ? name.GetString() ?? "" : "",
             Cliente = sapData.TryGetProperty("U_Cliente", out var client) ? client.GetString() ?? "" : "",
+            LivelloId = sapData.TryGetProperty("U_LivelloId", out var lvl) && int.TryParse(lvl.GetString(), out var lvlId)
+                ? lvlId
+                : (sapData.TryGetProperty("U_LivelloId", out var lvlNum) && lvlNum.ValueKind == JsonValueKind.Number ? lvlNum.GetInt32() : (int?)null),
             DataRendicontazione = sapData.TryGetProperty("U_DataRendicontazione", out var date) && DateTime.TryParse(date.GetString(), out var dt) ? dt : DateTime.MinValue,
             OreLavorate = sapData.TryGetProperty("U_OreLavorate", out var hours) ? hours.GetDouble() : 0,
             Note = sapData.TryGetProperty("U_Note", out var notes) ? notes.GetString() ?? "" : "",
@@ -173,6 +177,7 @@ public class TimesheetService : ITimesheetService
             U_NumeroProgetto = dto.NumeroProgetto,
             U_NomeProgetto = dto.NomeProgetto,
             U_Cliente = dto.Cliente,
+            U_LivelloId = dto.LivelloId?.ToString(),
             U_DataRendicontazione = dto.DataRendicontazione.ToString("yyyy-MM-ddTHH:mm:ss"),
             U_OreLavorate = dto.OreLavorate,
             U_Note = dto.Note,
@@ -180,6 +185,71 @@ public class TimesheetService : ITimesheetService
             U_DataCreazione = dto.DataCreazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss"),
             U_UltimaModifica = dto.UltimaModifica?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss")
         };
+    }
+
+    public async Task<List<TimesheetEntryDto>> GetEntriesByDateRangeAsync(DateTime? startDate, DateTime? endDate, string sessionId)
+    {
+        var entries = await GetAllEntriesAsync(sessionId);
+        if (startDate.HasValue)
+        {
+            entries = entries.Where(e => e.DataRendicontazione >= startDate.Value).ToList();
+        }
+        if (endDate.HasValue)
+        {
+            entries = entries.Where(e => e.DataRendicontazione <= endDate.Value).ToList();
+        }
+        return entries;
+    }
+
+    public async Task<List<TimesheetProjectStatsDto>> GetStatsByProjectAsync(string sessionId)
+    {
+        var entries = await GetAllEntriesAsync(sessionId);
+        return entries
+            .GroupBy(e => e.NumeroProgetto)
+            .Select(group => new TimesheetProjectStatsDto
+            {
+                NumeroProgetto = group.Key,
+                NomeProgetto = group.First().NomeProgetto,
+                Cliente = group.First().Cliente,
+                TotaleOre = group.Sum(e => e.OreLavorate),
+                NumeroRendicontazioni = group.Count(),
+                UltimaRendicontazione = group.Max(e => e.DataRendicontazione)
+            })
+            .OrderByDescending(stat => stat.TotaleOre)
+            .ToList();
+    }
+
+    public async Task<List<TimesheetUserStatsDto>> GetStatsByUserAsync(string sessionId)
+    {
+        var entries = await GetAllEntriesAsync(sessionId);
+        return entries
+            .GroupBy(e => e.Utente)
+            .Select(group => new TimesheetUserStatsDto
+            {
+                Utente = group.Key,
+                TotaleOre = group.Sum(e => e.OreLavorate),
+                NumeroRendicontazioni = group.Count(),
+                ProgettiCoinvolti = group.Select(e => e.NumeroProgetto).Distinct().Count()
+            })
+            .OrderByDescending(stat => stat.TotaleOre)
+            .ToList();
+    }
+
+    public async Task<List<TimesheetDailyStatsDto>> GetDailyStatsAsync(DateTime date, string sessionId)
+    {
+        var entries = await GetAllEntriesAsync(sessionId);
+        var filtered = entries.Where(e => e.DataRendicontazione.Date == date.Date);
+
+        return filtered
+            .GroupBy(e => e.DataRendicontazione.ToString("HH:00"))
+            .Select(group => new TimesheetDailyStatsDto
+            {
+                Ora = group.Key,
+                TotaleOre = group.Sum(e => e.OreLavorate),
+                Entries = group.Count()
+            })
+            .OrderBy(stat => stat.Ora)
+            .ToList();
     }
 }
 

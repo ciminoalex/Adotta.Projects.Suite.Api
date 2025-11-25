@@ -7,6 +7,7 @@ public class TimesheetEntryDto
     public string NumeroProgetto { get; set; } = string.Empty;
     public string NomeProgetto { get; set; } = string.Empty;
     public string Cliente { get; set; } = string.Empty;
+    public int? LivelloId { get; set; }
     public DateTime DataRendicontazione { get; set; }
     public double OreLavorate { get; set; }
     public string Note { get; set; } = string.Empty;
@@ -38,5 +39,30 @@ public class TimesheetSummaryDto
     public int TotaleRendicontazioni { get; set; }
     public int ProgettiRendicontati { get; set; }
     public double MediaOrePerProgetto { get; set; }
+}
+
+public class TimesheetProjectStatsDto
+{
+    public string NumeroProgetto { get; set; } = string.Empty;
+    public string NomeProgetto { get; set; } = string.Empty;
+    public string Cliente { get; set; } = string.Empty;
+    public double TotaleOre { get; set; }
+    public int NumeroRendicontazioni { get; set; }
+    public DateTime? UltimaRendicontazione { get; set; }
+}
+
+public class TimesheetUserStatsDto
+{
+    public string Utente { get; set; } = string.Empty;
+    public double TotaleOre { get; set; }
+    public int NumeroRendicontazioni { get; set; }
+    public int ProgettiCoinvolti { get; set; }
+}
+
+public class TimesheetDailyStatsDto
+{
+    public string Ora { get; set; } = string.Empty;
+    public double TotaleOre { get; set; }
+    public int Entries { get; set; }
 }
 

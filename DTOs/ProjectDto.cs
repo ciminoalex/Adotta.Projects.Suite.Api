@@ -27,6 +27,11 @@ public class ProjectDto
     public decimal? CostiSostenuti { get; set; }
     public List<LivelloProgettoDto>? Livelli { get; set; }
     public List<ProdottoProgettoDto>? Prodotti { get; set; }
+    public decimal? QuantitaTotaleMq { get; set; }
+    public decimal? QuantitaTotaleFt { get; set; }
+    public List<StoricoModificaDto>? Storico { get; set; }
+    public List<MessaggioProgettoDto>? Messaggi { get; set; }
+    public List<ChangeLogDto>? ChangeLog { get; set; }
 }
 
 public class LivelloProgettoDto
@@ -39,6 +44,7 @@ public class LivelloProgettoDto
     public DateTime? DataInizioInstallazione { get; set; }
     public DateTime? DataFineInstallazione { get; set; }
     public DateTime? DataCaricamento { get; set; }
+    public List<ProdottoProgettoDto>? Prodotti { get; set; }
 }
 
 public class ProdottoProgettoDto
@@ -49,6 +55,7 @@ public class ProdottoProgettoDto
     public string Variante { get; set; } = string.Empty;
     public decimal QMq { get; set; }
     public decimal QFt { get; set; }
+    public int? LivelloId { get; set; }
 }
 
 public class StoricoModificaDto
@@ -62,5 +69,17 @@ public class StoricoModificaDto
     public string? NuovoValore { get; set; }
     public string? VersioneWIC { get; set; }
     public string? Descrizione { get; set; }
+}
+
+public class ProjectExportRequestDto
+{
+    public string? Filters { get; set; }
+}
+
+public class ProjectExportResultDto
+{
+    public byte[] Content { get; set; } = Array.Empty<byte>();
+    public string ContentType { get; set; } = "text/csv";
+    public string FileName { get; set; } = "projects_export.csv";
 }
 

@@ -2,6 +2,7 @@ using ADOTTA.Projects.Suite.Api.Models;
 using ADOTTA.Projects.Suite.Api.DTOs;
 using ADOTTA.Projects.Suite.Api.Models.Enums;
 using System.Text.Json;
+using System.Linq;
 
 namespace ADOTTA.Projects.Suite.Api.Services.Mappers;
 
@@ -31,7 +32,9 @@ public static class ProjectMapper
             U_MarginePrevisto = dto.MarginePrevisto ?? 0,
             U_CostiSostenuti = dto.CostiSostenuti ?? 0,
             U_Note = dto.Note ?? "",
-            U_IsInRitardo = dto.IsInRitardo ? "Y" : "N"
+            U_IsInRitardo = dto.IsInRitardo ? "Y" : "N",
+            U_QtaTotaleMq = dto.QuantitaTotaleMq ?? 0,
+            U_QtaTotaleFt = dto.QuantitaTotaleFt ?? 0
         };
     }
 
@@ -59,7 +62,9 @@ public static class ProjectMapper
             Note = sapData.TryGetProperty("U_Note", out var notes) ? notes.GetString() : null,
             ValoreProgetto = sapData.TryGetProperty("U_ValoreProgetto", out var value) ? value.GetDecimal() : null,
             MarginePrevisto = sapData.TryGetProperty("U_MarginePrevisto", out var margin) ? margin.GetDecimal() : null,
-            CostiSostenuti = sapData.TryGetProperty("U_CostiSostenuti", out var costs) ? costs.GetDecimal() : 0
+            CostiSostenuti = sapData.TryGetProperty("U_CostiSostenuti", out var costs) ? costs.GetDecimal() : 0,
+            QuantitaTotaleMq = sapData.TryGetProperty("U_QtaTotaleMq", out var totMq) ? totMq.GetDecimal() : null,
+            QuantitaTotaleFt = sapData.TryGetProperty("U_QtaTotaleFt", out var totFt) ? totFt.GetDecimal() : null
         };
 
         // Extract child tables from the response (SAP uses Collection suffix)
@@ -81,10 +86,37 @@ public static class ProjectMapper
             }
         }
 
+        if (sapData.TryGetProperty("AX_ADT_PROHISTCollection", out var storicoArray) && storicoArray.ValueKind == JsonValueKind.Array)
+        {
+            project.Storico = new List<StoricoModificaDto>();
+            foreach (var storico in storicoArray.EnumerateArray())
+            {
+                project.Storico.Add(MapStoricoFromSap(storico));
+            }
+        }
+
+        if (sapData.TryGetProperty("AX_ADT_PROMSGCollection", out var messaggiArray) && messaggiArray.ValueKind == JsonValueKind.Array)
+        {
+            project.Messaggi = new List<MessaggioProgettoDto>();
+            foreach (var msg in messaggiArray.EnumerateArray())
+            {
+                project.Messaggi.Add(MapMessaggioFromSap(msg, project.NumeroProgetto));
+            }
+        }
+
+        if (sapData.TryGetProperty("AX_ADT_PROCHGCollection", out var changeArray) && changeArray.ValueKind == JsonValueKind.Array)
+        {
+            project.ChangeLog = new List<ChangeLogDto>();
+            foreach (var change in changeArray.EnumerateArray())
+            {
+                project.ChangeLog.Add(MapChangeLogFromSap(change, project.NumeroProgetto));
+            }
+        }
+
         return project;
     }
 
-    private static LivelloProgettoDto MapLivelloFromSap(JsonElement sapData, string numeroProgetto)
+    public static LivelloProgettoDto MapLivelloFromSap(JsonElement sapData, string numeroProgetto)
     {
         var id = 0;
         if (sapData.TryGetProperty("Code", out var code))
@@ -113,7 +145,7 @@ public static class ProjectMapper
         };
     }
 
-    private static ProdottoProgettoDto MapProdottoFromSap(JsonElement sapData, string numeroProgetto)
+    public static ProdottoProgettoDto MapProdottoFromSap(JsonElement sapData, string numeroProgetto)
     {
         var id = 0;
         if (sapData.TryGetProperty("Code", out var code))
@@ -136,7 +168,8 @@ public static class ProjectMapper
             TipoProdotto = sapData.TryGetProperty("U_TipoProdotto", out var tipo) ? tipo.GetString() ?? "" : "",
             Variante = sapData.TryGetProperty("U_Variante", out var variant) ? variant.GetString() ?? "" : "",
             QMq = sapData.TryGetProperty("U_QMq", out var qmq) ? qmq.GetDecimal() : 0,
-            QFt = sapData.TryGetProperty("U_QFt", out var qft) ? qft.GetDecimal() : 0
+            QFt = sapData.TryGetProperty("U_QFt", out var qft) ? qft.GetDecimal() : 0,
+            LivelloId = sapData.TryGetProperty("U_LivelloId", out var lvlId) && int.TryParse(lvlId.GetString(), out var parsedLvl) ? parsedLvl : null
         };
     }
 
@@ -165,8 +198,73 @@ public static class ProjectMapper
             U_TipoProdotto = dto.TipoProdotto,
             U_Variante = dto.Variante,
             U_QMq = dto.QMq,
-            U_QFt = dto.QFt
+            U_QFt = dto.QFt,
+            U_LivelloId = dto.LivelloId?.ToString()
         };
+    }
+
+    public static StoricoModificaDto MapStoricoFromSap(JsonElement sapData)
+    {
+        return new StoricoModificaDto
+        {
+            Id = sapData.TryGetProperty("Code", out var code) ? int.TryParse(code.GetString(), out var parsed) ? parsed : 0 : 0,
+            NumeroProgetto = sapData.TryGetProperty("U_Parent", out var parent) ? parent.GetString() ?? string.Empty : string.Empty,
+            DataModifica = sapData.TryGetProperty("U_DataModifica", out var date) && DateTime.TryParse(date.GetString(), out var dt) ? dt : DateTime.MinValue,
+            UtenteModifica = sapData.TryGetProperty("U_UtenteModifica", out var user) ? user.GetString() ?? string.Empty : string.Empty,
+            CampoModificato = sapData.TryGetProperty("U_CampoModificato", out var field) ? field.GetString() ?? string.Empty : string.Empty,
+            ValorePrecedente = sapData.TryGetProperty("U_ValorePrecedente", out var oldVal) ? oldVal.GetString() : null,
+            NuovoValore = sapData.TryGetProperty("U_NuovoValore", out var newVal) ? newVal.GetString() : null,
+            VersioneWIC = sapData.TryGetProperty("U_VersioneWIC", out var version) ? version.GetString() : null,
+            Descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() : null
+        };
+    }
+
+    public static MessaggioProgettoDto MapMessaggioFromSap(JsonElement sapData, string numeroProgetto)
+    {
+        return new MessaggioProgettoDto
+        {
+            Id = sapData.TryGetProperty("Code", out var code) ? ExtractNumericId(code.GetString()) : 0,
+            NumeroProgetto = numeroProgetto,
+            Data = sapData.TryGetProperty("U_Data", out var date) && DateTime.TryParse(date.GetString(), out var dt) ? dt : DateTime.UtcNow,
+            Utente = sapData.TryGetProperty("U_Utente", out var user) ? user.GetString() ?? string.Empty : string.Empty,
+            Messaggio = sapData.TryGetProperty("U_Messaggio", out var msg) ? msg.GetString() ?? string.Empty : string.Empty,
+            Tipo = sapData.TryGetProperty("U_Tipo", out var tipo) ? tipo.GetString() ?? "info" : "info",
+            Allegato = sapData.TryGetProperty("U_Allegato", out var attachment) ? attachment.GetString() : null
+        };
+    }
+
+    public static ChangeLogDto MapChangeLogFromSap(JsonElement sapData, string numeroProgetto)
+    {
+        var dettagliDict = default(Dictionary<string, string>?);
+        if (sapData.TryGetProperty("U_DettagliJson", out var dett) && dett.ValueKind == JsonValueKind.String)
+        {
+            try
+            {
+                dettagliDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(dett.GetString() ?? "{}");
+            }
+            catch
+            {
+                dettagliDict = null;
+            }
+        }
+
+        return new ChangeLogDto
+        {
+            Id = sapData.TryGetProperty("Code", out var code) ? ExtractNumericId(code.GetString()) : 0,
+            NumeroProgetto = numeroProgetto,
+            Data = sapData.TryGetProperty("U_Data", out var date) && DateTime.TryParse(date.GetString(), out var dt) ? dt : DateTime.UtcNow,
+            Utente = sapData.TryGetProperty("U_Utente", out var user) ? user.GetString() ?? string.Empty : string.Empty,
+            Azione = sapData.TryGetProperty("U_Azione", out var action) ? action.GetString() ?? string.Empty : string.Empty,
+            Descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() ?? string.Empty : string.Empty,
+            Dettagli = dettagliDict
+        };
+    }
+
+    private static int ExtractNumericId(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return 0;
+        var digits = new string(code.Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var parsed) ? parsed : 0;
     }
 }
 

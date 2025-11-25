@@ -1,6 +1,7 @@
 using ADOTTA.Projects.Suite.Api.DTOs;
 using ADOTTA.Projects.Suite.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Globalization;
 
 namespace ADOTTA.Projects.Suite.Api.Controllers;
 
@@ -116,6 +117,23 @@ public class TimesheetController : ControllerBase
         }
     }
 
+    [HttpGet("by-date-range")]
+    public async Task<ActionResult<List<TimesheetEntryDto>>> GetByDateRange([FromQuery] string? startDate, [FromQuery] string? endDate)
+    {
+        try
+        {
+            var start = ParseDate(startDate);
+            var end = ParseDate(endDate);
+            var entries = await _timesheetService.GetEntriesByDateRangeAsync(start, end, GetSessionId());
+            return Ok(entries);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting timesheet entries by date range");
+            return StatusCode(500, new { message = "Error retrieving timesheet entries", error = ex.Message });
+        }
+    }
+
     [HttpGet("overview")]
     public async Task<ActionResult<TimesheetOverviewDto>> GetOverview([FromQuery] string? fromDate, [FromQuery] string? toDate, [FromQuery] string? utente)
     {
@@ -159,6 +177,71 @@ public class TimesheetController : ControllerBase
             _logger.LogError(ex, "Error getting timesheet entries for user: {Utente}", utente);
             return StatusCode(500, new { message = "Error retrieving timesheet entries", error = ex.Message });
         }
+    }
+
+    [HttpGet("stats/by-project")]
+    public async Task<ActionResult<List<TimesheetProjectStatsDto>>> GetStatsByProject()
+    {
+        try
+        {
+            var stats = await _timesheetService.GetStatsByProjectAsync(GetSessionId());
+            return Ok(stats);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting timesheet stats by project");
+            return StatusCode(500, new { message = "Error retrieving stats", error = ex.Message });
+        }
+    }
+
+    [HttpGet("stats/by-user")]
+    public async Task<ActionResult<List<TimesheetUserStatsDto>>> GetStatsByUser()
+    {
+        try
+        {
+            var stats = await _timesheetService.GetStatsByUserAsync(GetSessionId());
+            return Ok(stats);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting timesheet stats by user");
+            return StatusCode(500, new { message = "Error retrieving stats", error = ex.Message });
+        }
+    }
+
+    [HttpGet("stats/daily")]
+    public async Task<ActionResult<List<TimesheetDailyStatsDto>>> GetDailyStats([FromQuery] string date)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(date))
+            {
+                return BadRequest(new { message = "date query parameter is required" });
+            }
+
+            if (!DateTime.TryParse(date, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedDate))
+            {
+                return BadRequest(new { message = "Invalid date format. Use ISO 8601." });
+            }
+
+            var stats = await _timesheetService.GetDailyStatsAsync(parsedDate, GetSessionId());
+            return Ok(stats);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting daily timesheet stats");
+            return StatusCode(500, new { message = "Error retrieving stats", error = ex.Message });
+        }
+    }
+
+    private static DateTime? ParseDate(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return null;
+        if (DateTime.TryParse(input, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
+        {
+            return parsed;
+        }
+        return null;
     }
 }
 

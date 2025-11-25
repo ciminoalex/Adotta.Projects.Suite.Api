@@ -1,3 +1,5 @@
+using System.Linq;
+using System.Text;
 using System.Text.Json;
 using ADOTTA.Projects.Suite.Api.DTOs;
 using ADOTTA.Projects.Suite.Api.Services.Mappers;
@@ -6,6 +8,38 @@ namespace ADOTTA.Projects.Suite.Api.Services;
 
 public class ProjectService : IProjectService
 {
+    private const string ProjectTable = "AX_ADT_PROJECT";
+    private const string LivelliTable = "@AX_ADT_PROJLVL";
+    private const string ProdottiTable = "@AX_ADT_PROPRD";
+    private const string MessaggiTable = "@AX_ADT_PROMSG";
+    private const string ChangeLogTable = "@AX_ADT_PROCHG";
+
+    private static readonly IReadOnlyDictionary<string, string> ProjectPatchMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["cliente"] = "U_Cliente",
+        ["nomeProgetto"] = "Name",
+        ["citta"] = "U_Citta",
+        ["stato"] = "U_Stato",
+        ["teamTecnico"] = "U_TeamTecnico",
+        ["teamApl"] = "U_TeamAPL",
+        ["sales"] = "U_Sales",
+        ["projectManager"] = "U_ProjectManager",
+        ["teamInstallazione"] = "U_TeamInstallazione",
+        ["dataCreazione"] = "U_DataCreazione",
+        ["dataInizioInstallazione"] = "U_DataInizioInstall",
+        ["dataFineInstallazione"] = "U_DataFineInstall",
+        ["versioneWic"] = "U_VersioneWIC",
+        ["ultimaModifica"] = "U_UltimaModifica",
+        ["statoProgetto"] = "U_StatoProgetto",
+        ["isInRitardo"] = "U_IsInRitardo",
+        ["note"] = "U_Note",
+        ["valoreProgetto"] = "U_ValoreProgetto",
+        ["marginePrevisto"] = "U_MarginePrevisto",
+        ["costiSostenuti"] = "U_CostiSostenuti",
+        ["quantitaTotaleMq"] = "U_QtaTotaleMq",
+        ["quantitaTotaleFt"] = "U_QtaTotaleFt"
+    };
+
     private readonly ISAPServiceLayerClient _sapClient;
     private readonly ILogger<ProjectService> _logger;
 
@@ -17,7 +51,7 @@ public class ProjectService : IProjectService
 
     public async Task<List<ProjectDto>> GetAllProjectsAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROJECT", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(ProjectTable, null, sessionId);
         return sapData.Select(MapToProjectDto).ToList();
     }
 
@@ -25,7 +59,7 @@ public class ProjectService : IProjectService
     {
         try
         {
-            var sapData = await _sapClient.GetRecordAsync<JsonElement>("AX_ADT_PROJECT", numeroProgetto, sessionId);
+            var sapData = await _sapClient.GetRecordAsync<JsonElement>(ProjectTable, numeroProgetto, sessionId);
             if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
             
             // Child tables are included in the response, no need for separate calls
@@ -42,26 +76,38 @@ public class ProjectService : IProjectService
     public async Task<ProjectDto> CreateProjectAsync(ProjectDto project, string sessionId)
     {
         var sapUDO = ProjectMapper.MapProjectToSapUDO(project);
-        var result = await _sapClient.CreateRecordAsync<JsonElement>("AX_ADT_PROJECT", sapUDO, sessionId);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>(ProjectTable, sapUDO, sessionId);
         return ProjectMapper.MapSapUDOToProject(result);
     }
 
     public async Task<ProjectDto> UpdateProjectAsync(string numeroProgetto, ProjectDto project, string sessionId)
     {
         var sapUDO = ProjectMapper.MapProjectToSapUDO(project);
-        var result = await _sapClient.UpdateRecordAsync<JsonElement>("AX_ADT_PROJECT", numeroProgetto, sapUDO, sessionId);
+        var result = await _sapClient.UpdateRecordAsync<JsonElement>(ProjectTable, numeroProgetto, sapUDO, sessionId);
+        return ProjectMapper.MapSapUDOToProject(result);
+    }
+
+    public async Task<ProjectDto> PatchProjectAsync(string numeroProgetto, JsonElement patchDocument, string sessionId)
+    {
+        var payload = BuildProjectPatchPayload(patchDocument);
+        if (payload.Count == 0)
+        {
+            throw new ArgumentException("Nessun campo valido nel payload di patch");
+        }
+
+        var result = await _sapClient.UpdateRecordAsync<JsonElement>(ProjectTable, numeroProgetto, payload, sessionId);
         return ProjectMapper.MapSapUDOToProject(result);
     }
 
     public async Task DeleteProjectAsync(string numeroProgetto, string sessionId)
     {
-        await _sapClient.DeleteRecordAsync("AX_ADT_PROJECT", numeroProgetto, sessionId);
+        await _sapClient.DeleteRecordAsync(ProjectTable, numeroProgetto, sessionId);
     }
 
     public async Task<List<ProjectDto>> SearchProjectsAsync(string searchTerm, string sessionId)
     {
         var filter = $"(contains(Code, '{searchTerm}') or contains(Name, '{searchTerm}') or contains(U_Cliente, '{searchTerm}'))";
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROJECT", filter, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(ProjectTable, filter, sessionId);
         return sapData.Select(MapToProjectDto).ToList();
     }
 
@@ -85,7 +131,7 @@ public class ProjectService : IProjectService
             filterConditions.Add($"U_DataCreazione le '{filter.DataCreazioneA.Value:yyyy-MM-dd}'");
         
         var filterStr = string.Join(" and ", filterConditions);
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PROJECT", filterStr, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(ProjectTable, filterStr, sessionId);
         return sapData.Select(MapToProjectDto).ToList();
     }
 
@@ -110,7 +156,7 @@ public class ProjectService : IProjectService
         if (project == null) return new List<StoricoModificaDto>();
         
         // Extract storico from the project response
-        var sapData = await _sapClient.GetRecordAsync<JsonElement>("AX_ADT_PROJECT", numeroProgetto, sessionId);
+        var sapData = await _sapClient.GetRecordAsync<JsonElement>(ProjectTable, numeroProgetto, sessionId);
         if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null)
             return new List<StoricoModificaDto>();
         
@@ -119,7 +165,7 @@ public class ProjectService : IProjectService
         {
             foreach (var item in storicoArray.EnumerateArray())
             {
-                storico.Add(MapToStoricoDto(item));
+                storico.Add(ProjectMapper.MapStoricoFromSap(item));
             }
         }
         
@@ -129,27 +175,43 @@ public class ProjectService : IProjectService
     public async Task<LivelloProgettoDto> CreateLivelloAsync(string numeroProgetto, LivelloProgettoDto livello, string sessionId)
     {
         var sapUDO = ProjectMapper.MapLivelloToSap(livello, numeroProgetto);
-        var result = await _sapClient.CreateRecordAsync<JsonElement>("@AX_ADT_PROJLVL", sapUDO, sessionId);
-        return MapToLivelloDto(result);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>(LivelliTable, sapUDO, sessionId);
+        return ProjectMapper.MapLivelloFromSap(result, numeroProgetto);
+    }
+
+    public async Task<LivelloProgettoDto> UpdateLivelloAsync(string numeroProgetto, int livelloId, LivelloProgettoDto livello, string sessionId)
+    {
+        livello.Id = livelloId;
+        var sapUDO = ProjectMapper.MapLivelloToSap(livello, numeroProgetto);
+        var result = await _sapClient.UpdateRecordAsync<JsonElement>(LivelliTable, $"{numeroProgetto}-L{livelloId}", sapUDO, sessionId);
+        return ProjectMapper.MapLivelloFromSap(result, numeroProgetto);
     }
 
     public async Task DeleteLivelloAsync(string numeroProgetto, int livelloId, string sessionId)
     {
         var code = $"{numeroProgetto}-L{livelloId}";
-        await _sapClient.DeleteRecordAsync("@AX_ADT_PROJLVL", code, sessionId);
+        await _sapClient.DeleteRecordAsync(LivelliTable, code, sessionId);
     }
 
     public async Task<ProdottoProgettoDto> CreateProdottoAsync(string numeroProgetto, ProdottoProgettoDto prodotto, string sessionId)
     {
         var sapUDO = ProjectMapper.MapProdottoToSap(prodotto, numeroProgetto);
-        var result = await _sapClient.CreateRecordAsync<JsonElement>("@AX_ADT_PROPRD", sapUDO, sessionId);
-        return MapToProdottoDto(result);
+        var result = await _sapClient.CreateRecordAsync<JsonElement>(ProdottiTable, sapUDO, sessionId);
+        return ProjectMapper.MapProdottoFromSap(result, numeroProgetto);
+    }
+
+    public async Task<ProdottoProgettoDto> UpdateProdottoAsync(string numeroProgetto, int prodottoId, ProdottoProgettoDto prodotto, string sessionId)
+    {
+        prodotto.Id = prodottoId;
+        var sapUDO = ProjectMapper.MapProdottoToSap(prodotto, numeroProgetto);
+        var result = await _sapClient.UpdateRecordAsync<JsonElement>(ProdottiTable, $"{numeroProgetto}-P{prodottoId}", sapUDO, sessionId);
+        return ProjectMapper.MapProdottoFromSap(result, numeroProgetto);
     }
 
     public async Task DeleteProdottoAsync(string numeroProgetto, int prodottoId, string sessionId)
     {
         var code = $"{numeroProgetto}-P{prodottoId}";
-        await _sapClient.DeleteRecordAsync("@AX_ADT_PROPRD", code, sessionId);
+        await _sapClient.DeleteRecordAsync(ProdottiTable, code, sessionId);
     }
 
     public async Task<List<StoricoModificaDto>> CreateWicSnapshotAsync(string numeroProgetto, string sessionId)
@@ -158,21 +220,105 @@ public class ProjectService : IProjectService
         var project = await GetProjectByCodeAsync(numeroProgetto, sessionId);
         if (project == null) return new List<StoricoModificaDto>();
 
-        // Create snapshot entries for all project fields
-        var snapshot = new List<StoricoModificaDto>
+        var snapshotEntry = new
         {
-            new StoricoModificaDto
-            {
-                NumeroProgetto = numeroProgetto,
-                DataModifica = DateTime.UtcNow,
-                UtenteModifica = "System",
-                CampoModificato = "WIC Snapshot",
-                Descrizione = $"WIC Snapshot created at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}",
-                VersioneWIC = project.VersioneWIC ?? "1.0"
-            }
+            Code = Guid.NewGuid().ToString("N"),
+            Name = $"WIC Snapshot {DateTime.UtcNow:yyyyMMddHHmmss}",
+            U_Parent = numeroProgetto,
+            U_DataModifica = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss"),
+            U_UtenteModifica = "System",
+            U_CampoModificato = "WIC Snapshot",
+            U_ValorePrecedente = project.VersioneWIC,
+            U_NuovoValore = project.VersioneWIC,
+            U_VersioneWIC = project.VersioneWIC ?? "WIC-1.0",
+            U_Descrizione = $"Snapshot generata il {DateTime.UtcNow:dd/MM/yyyy HH:mm:ss}"
         };
 
-        return snapshot;
+        await _sapClient.CreateRecordAsync<JsonElement>("@AX_ADT_PROHIST", snapshotEntry, sessionId);
+        return await GetStoricoAsync(numeroProgetto, sessionId);
+    }
+
+    public async Task<List<ProdottoProgettoDto>> GetProdottiByLivelloAsync(string numeroProgetto, int livelloId, string sessionId)
+    {
+        var filter = $"U_Parent eq '{numeroProgetto}' and U_LivelloId eq '{livelloId}'";
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(ProdottiTable, filter, sessionId);
+        return sapData.Select(item => ProjectMapper.MapProdottoFromSap(item, numeroProgetto)).ToList();
+    }
+
+    public async Task<List<MessaggioProgettoDto>> GetMessaggiAsync(string numeroProgetto, string sessionId)
+    {
+        var filter = $"U_Project eq '{numeroProgetto}'";
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(MessaggiTable, filter, sessionId);
+        return sapData.Select(item => ProjectMapper.MapMessaggioFromSap(item, numeroProgetto)).ToList();
+    }
+
+    public async Task<MessaggioProgettoDto> CreateMessaggioAsync(string numeroProgetto, MessaggioProgettoDto messaggio, string sessionId)
+    {
+        var payload = MapMessaggioToSap(numeroProgetto, messaggio);
+        var created = await _sapClient.CreateRecordAsync<JsonElement>(MessaggiTable, payload, sessionId);
+        return ProjectMapper.MapMessaggioFromSap(created, numeroProgetto);
+    }
+
+    public async Task<MessaggioProgettoDto> UpdateMessaggioAsync(string numeroProgetto, int messaggioId, MessaggioProgettoDto messaggio, string sessionId)
+    {
+        messaggio.Id = messaggioId;
+        var payload = MapMessaggioToSap(numeroProgetto, messaggio);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(MessaggiTable, BuildMessageCode(numeroProgetto, messaggioId), payload, sessionId);
+        return ProjectMapper.MapMessaggioFromSap(updated, numeroProgetto);
+    }
+
+    public async Task DeleteMessaggioAsync(string numeroProgetto, int messaggioId, string sessionId)
+    {
+        await _sapClient.DeleteRecordAsync(MessaggiTable, BuildMessageCode(numeroProgetto, messaggioId), sessionId);
+    }
+
+    public async Task<List<ChangeLogDto>> GetChangeLogAsync(string numeroProgetto, string sessionId)
+    {
+        var filter = $"U_Project eq '{numeroProgetto}'";
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(ChangeLogTable, filter, sessionId);
+        return sapData.Select(item => ProjectMapper.MapChangeLogFromSap(item, numeroProgetto)).ToList();
+    }
+
+    public async Task<ChangeLogDto> CreateChangeLogAsync(string numeroProgetto, ChangeLogDto change, string sessionId)
+    {
+        var payload = MapChangeLogToSap(numeroProgetto, change);
+        var created = await _sapClient.CreateRecordAsync<JsonElement>(ChangeLogTable, payload, sessionId);
+        return ProjectMapper.MapChangeLogFromSap(created, numeroProgetto);
+    }
+
+    public async Task<ProjectExportResultDto> ExportProjectsAsync(string format, ProjectExportRequestDto request, string sessionId)
+    {
+        var projects = await GetAllProjectsAsync(sessionId);
+        projects = ApplyExportFilters(projects, request);
+
+        var normalizedFormat = (format ?? "csv").ToLowerInvariant();
+        var extension = normalizedFormat switch
+        {
+            "xlsx" => "xlsx",
+            "pdf" => "pdf",
+            _ => "csv"
+        };
+
+        var contentType = normalizedFormat switch
+        {
+            "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "pdf" => "application/pdf",
+            _ => "text/csv"
+        };
+
+        var content = normalizedFormat switch
+        {
+            "pdf" => GenerateCsv(projects), // placeholder same data
+            "xlsx" => GenerateCsv(projects),
+            _ => GenerateCsv(projects)
+        };
+
+        return new ProjectExportResultDto
+        {
+            Content = content,
+            ContentType = contentType,
+            FileName = $"projects_{DateTime.UtcNow:yyyyMMddHHmmss}.{extension}"
+        };
     }
 
     public async Task<ProjectStatsDto> GetProjectStatsAsync(string sessionId)
@@ -222,48 +368,178 @@ public class ProjectService : IProjectService
         return ProjectMapper.MapSapUDOToProject(sapData);
     }
 
-    private LivelloProgettoDto MapToLivelloDto(JsonElement sapData)
+    private Dictionary<string, object?> BuildProjectPatchPayload(JsonElement patchDocument)
     {
-        return new LivelloProgettoDto
+        var payload = new Dictionary<string, object?>();
+        foreach (var property in patchDocument.EnumerateObject())
         {
-            Id = sapData.TryGetProperty("Code", out var code) ? int.Parse(code.GetString() ?? "0") : 0,
-            NumeroProgetto = sapData.TryGetProperty("U_Parent", out var parent) ? parent.GetString() ?? "" : "",
-            Nome = sapData.TryGetProperty("Name", out var name) ? name.GetString() ?? "" : "",
-            Ordine = sapData.TryGetProperty("U_Ordine", out var order) ? order.GetInt32() : 0,
-            Descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() : null,
-            DataInizioInstallazione = sapData.TryGetProperty("U_DataInizio", out var start) && DateTime.TryParse(start.GetString(), out var dtStart) ? dtStart : null,
-            DataFineInstallazione = sapData.TryGetProperty("U_DataFine", out var end) && DateTime.TryParse(end.GetString(), out var dtEnd) ? dtEnd : null,
-            DataCaricamento = sapData.TryGetProperty("U_DataCaricamento", out var load) && DateTime.TryParse(load.GetString(), out var dtLoad) ? dtLoad : null
+            if (!ProjectPatchMap.TryGetValue(property.Name, out var sapField))
+            {
+                continue;
+            }
+
+            payload[sapField] = ConvertPatchValue(property.Name, property.Value);
+        }
+
+        return payload;
+    }
+
+    private object? ConvertPatchValue(string propertyName, JsonElement value)
+    {
+        switch (value.ValueKind)
+        {
+            case JsonValueKind.String:
+                if (DateTime.TryParse(value.GetString(), out var dt))
+                {
+                    return dt.ToString("yyyy-MM-ddTHH:mm:ss");
+                }
+                return value.GetString();
+            case JsonValueKind.Number:
+                if (value.TryGetInt32(out var intVal))
+                {
+                    return intVal;
+                }
+                if (value.TryGetDecimal(out var decVal))
+                {
+                    return decVal;
+                }
+                return value.GetDouble();
+            case JsonValueKind.True:
+            case JsonValueKind.False:
+                var boolVal = value.GetBoolean();
+                return propertyName.Equals("isInRitardo", StringComparison.OrdinalIgnoreCase)
+                    ? (boolVal ? "Y" : "N")
+                    : boolVal;
+            default:
+                return value.GetRawText();
+        }
+    }
+
+    private object MapMessaggioToSap(string numeroProgetto, MessaggioProgettoDto messaggio)
+    {
+        var ensuredId = EnsureEntityId(messaggio.Id);
+        messaggio.Id = ensuredId;
+        var code = BuildMessageCode(numeroProgetto, ensuredId);
+
+        return new
+        {
+            Code = code,
+            Name = $"{numeroProgetto}-MSG{ensuredId}",
+            U_Project = numeroProgetto,
+            U_Data = messaggio.Data == default ? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss") : messaggio.Data.ToString("yyyy-MM-ddTHH:mm:ss"),
+            U_Utente = messaggio.Utente,
+            U_Messaggio = messaggio.Messaggio,
+            U_Tipo = messaggio.Tipo,
+            U_Allegato = messaggio.Allegato
         };
     }
 
-    private ProdottoProgettoDto MapToProdottoDto(JsonElement sapData)
+    private static string BuildMessageCode(string numeroProgetto, int messaggioId) => $"{numeroProgetto}-MSG{messaggioId}";
+
+    private object MapChangeLogToSap(string numeroProgetto, ChangeLogDto change)
     {
-        return new ProdottoProgettoDto
+        var ensuredId = EnsureEntityId(change.Id);
+        change.Id = ensuredId;
+
+        return new
         {
-            Id = sapData.TryGetProperty("Code", out var code) ? int.Parse(code.GetString() ?? "0") : 0,
-            NumeroProgetto = sapData.TryGetProperty("U_Parent", out var parent) ? parent.GetString() ?? "" : "",
-            TipoProdotto = sapData.TryGetProperty("U_TipoProdotto", out var tipo) ? tipo.GetString() ?? "" : "",
-            Variante = sapData.TryGetProperty("U_Variante", out var variant) ? variant.GetString() ?? "" : "",
-            QMq = sapData.TryGetProperty("U_QMq", out var qmq) ? qmq.GetDecimal() : 0,
-            QFt = sapData.TryGetProperty("U_QFt", out var qft) ? qft.GetDecimal() : 0
+            Code = BuildChangeLogCode(numeroProgetto, ensuredId),
+            Name = $"{numeroProgetto}-CHG{ensuredId}",
+            U_Project = numeroProgetto,
+            U_Data = change.Data == default ? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss") : change.Data.ToString("yyyy-MM-ddTHH:mm:ss"),
+            U_Utente = change.Utente,
+            U_Azione = change.Azione,
+            U_Descrizione = change.Descrizione,
+            U_DettagliJson = JsonSerializer.Serialize(change.Dettagli ?? new Dictionary<string, string>())
         };
     }
 
-    private StoricoModificaDto MapToStoricoDto(JsonElement sapData)
+    private static string BuildChangeLogCode(string numeroProgetto, int changeId) => $"{numeroProgetto}-CHG{changeId}";
+
+    private static int EnsureEntityId(int? id)
     {
-        return new StoricoModificaDto
+        if (id.HasValue && id.Value > 0) return id.Value;
+        var generated = (int)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % int.MaxValue);
+        return generated == 0 ? 1 : generated;
+    }
+
+    private List<ProjectDto> ApplyExportFilters(List<ProjectDto> projects, ProjectExportRequestDto request)
+    {
+        if (request?.Filters == null)
         {
-            Id = sapData.TryGetProperty("Code", out var code) ? int.Parse(code.GetString() ?? "0") : 0,
-            NumeroProgetto = sapData.TryGetProperty("U_Parent", out var parent) ? parent.GetString() ?? "" : "",
-            DataModifica = sapData.TryGetProperty("U_DataModifica", out var date) && DateTime.TryParse(date.GetString(), out var dt) ? dt : DateTime.MinValue,
-            UtenteModifica = sapData.TryGetProperty("U_UtenteModifica", out var user) ? user.GetString() ?? "" : "",
-            CampoModificato = sapData.TryGetProperty("Name", out var field) ? field.GetString() ?? "" : "",
-            ValorePrecedente = sapData.TryGetProperty("U_ValorePrecedente", out var oldVal) ? oldVal.GetString() : null,
-            NuovoValore = sapData.TryGetProperty("U_NuovoValore", out var newVal) ? newVal.GetString() : null,
-            VersioneWIC = sapData.TryGetProperty("U_VersioneWIC", out var version) ? version.GetString() : null,
-            Descrizione = null
-        };
+            return projects;
+        }
+
+        try
+        {
+            var filters = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(request.Filters);
+            if (filters == null) return projects;
+
+            foreach (var filter in filters)
+            {
+                switch (filter.Key.ToLowerInvariant())
+                {
+                    case "cliente":
+                        var cliente = filter.Value.GetString();
+                        if (!string.IsNullOrWhiteSpace(cliente))
+                        {
+                            projects = projects.Where(p => p.Cliente.Contains(cliente, StringComparison.OrdinalIgnoreCase)).ToList();
+                        }
+                        break;
+                    case "statoProgetto":
+                        var stato = filter.Value.GetString();
+                        if (!string.IsNullOrWhiteSpace(stato))
+                        {
+                            projects = projects.Where(p => string.Equals(p.StatoProgetto.ToString(), stato, StringComparison.OrdinalIgnoreCase)).ToList();
+                        }
+                        break;
+                    case "projectManager":
+                        var pm = filter.Value.GetString();
+                        if (!string.IsNullOrWhiteSpace(pm))
+                        {
+                            projects = projects.Where(p => string.Equals(p.ProjectManager, pm, StringComparison.OrdinalIgnoreCase)).ToList();
+                        }
+                        break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Impossibile applicare i filtri export, verranno ignorati");
+        }
+
+        return projects;
+    }
+
+    private byte[] GenerateCsv(IEnumerable<ProjectDto> projects)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("NumeroProgetto;NomeProgetto;Cliente;StatoProgetto;TotaleMq;TotaleFt;ValoreProgetto");
+        foreach (var project in projects)
+        {
+            sb.AppendLine(string.Join(';', new[]
+            {
+                project.NumeroProgetto,
+                Quote(project.NomeProgetto),
+                Quote(project.Cliente),
+                project.StatoProgetto.ToString(),
+                project.QuantitaTotaleMq?.ToString("0.##") ?? "0",
+                project.QuantitaTotaleFt?.ToString("0.##") ?? "0",
+                project.ValoreProgetto?.ToString("0.##") ?? "0"
+            }));
+        }
+
+        return Encoding.UTF8.GetBytes(sb.ToString());
+    }
+
+    private static string Quote(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        if (value.Contains(';') || value.Contains('"'))
+        {
+            return $"\"{value.Replace("\"", "\"\"")}\"";
+        }
+        return value;
     }
 }
 

@@ -15,9 +15,9 @@ public class SAPSessionMiddleware
     {
         // Estrai SessionId dal header
         var sessionId = context.Request.Headers["X-SAP-Session-Id"].ToString();
-        
+
         // Aggiungi SessionId al context per uso downstream
-        if (!string.IsNullOrEmpty(sessionId))
+        if (!string.IsNullOrWhiteSpace(sessionId))
         {
             context.Items["SAPSessionId"] = sessionId;
             _logger.LogDebug("SAP SessionId found: {SessionId}", sessionId);
@@ -26,6 +26,21 @@ public class SAPSessionMiddleware
         {
             _logger.LogDebug("No SAP SessionId found in request");
         }
+
+        context.Response.OnStarting(() =>
+        {
+            if (!context.Response.Headers.ContainsKey("X-SAP-Session-Id"))
+            {
+                if (context.Items.TryGetValue("SAPSessionId", out var storedSessionObj)
+                    && storedSessionObj is string storedSessionId
+                    && !string.IsNullOrWhiteSpace(storedSessionId))
+                {
+                    context.Response.Headers["X-SAP-Session-Id"] = storedSessionId;
+                }
+            }
+
+            return Task.CompletedTask;
+        });
 
         await _next(context);
     }

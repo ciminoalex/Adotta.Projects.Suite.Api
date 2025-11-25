@@ -76,6 +76,7 @@ builder.Services.AddHttpClient<ISAPServiceLayerClient, SAPServiceLayerClient>()
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<ITimesheetService, TimesheetService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IInitializationService, InitializationService>();
 
 // Register validators

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 using ADOTTA.Projects.Suite.Api.Models.Lookup;
 
@@ -5,6 +6,16 @@ namespace ADOTTA.Projects.Suite.Api.Services;
 
 public class LookupService : ILookupService
 {
+    private const string BusinessPartnersTable = "BusinessPartners";
+    private const string StatiTable = "AX_ADT_STATI";
+    private const string CittaTable = "AX_ADT_CITTA";
+    private const string TeamTecniciTable = "AX_ADT_TEAMTECH";
+    private const string TeamAPLTable = "AX_ADT_TEAMAPL";
+    private const string SalesTable = "AX_ADT_SALES";
+    private const string ProjectManagerTable = "AX_ADT_PMGR";
+    private const string SquadraInstallazioneTable = "AX_ADT_SQUADRA";
+    private const string ProdottiMasterTable = "AX_ADT_PRODMAST";
+
     private readonly ISAPServiceLayerClient _sapClient;
     private readonly ILogger<LookupService> _logger;
 
@@ -16,21 +27,56 @@ public class LookupService : ILookupService
 
     public async Task<List<Cliente>> GetAllClientiAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("BusinessPartners", "CardType eq 'C'", sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(BusinessPartnersTable, "CardType eq 'C'", sessionId);
         return sapData.Select(MapToCliente).ToList();
     }
 
     public async Task<Cliente?> GetClienteByIdAsync(string id, string sessionId)
     {
-        var sapData = await _sapClient.GetRecordAsync<JsonElement>("BusinessPartners", id, sessionId);
+        var sapData = await _sapClient.GetRecordAsync<JsonElement>(BusinessPartnersTable, id, sessionId);
         if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
         return MapToCliente(sapData);
     }
 
+    public async Task<List<Cliente>> SearchClientiAsync(string query, string sessionId)
+    {
+        var safeQuery = (query ?? string.Empty).Replace("'", "''");
+        var filter = $"CardType eq 'C' and (contains(CardCode, '{safeQuery}') or contains(CardName, '{safeQuery}') or contains(EmailAddress, '{safeQuery}'))";
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(BusinessPartnersTable, filter, sessionId);
+        return sapData.Select(MapToCliente).ToList();
+    }
+
+    public async Task<Cliente> CreateClienteAsync(Cliente cliente, string sessionId)
+    {
+        var payload = MapClienteToSap(cliente, isUpdate: false);
+        var created = await _sapClient.CreateRecordAsync<JsonElement>(BusinessPartnersTable, payload, sessionId);
+        return MapToCliente(created);
+    }
+
+    public async Task<Cliente> UpdateClienteAsync(string id, Cliente cliente, string sessionId)
+    {
+        cliente.CardCode = id;
+        var payload = MapClienteToSap(cliente, isUpdate: true);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(BusinessPartnersTable, id, payload, sessionId);
+        return MapToCliente(updated);
+    }
+
+    public async Task DeleteClienteAsync(string id, string sessionId)
+    {
+        await _sapClient.DeleteRecordAsync(BusinessPartnersTable, id, sessionId);
+    }
+
     public async Task<List<Stato>> GetAllStatiAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_STATI", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(StatiTable, null, sessionId);
         return sapData.Select(MapToStato).ToList();
+    }
+
+    public async Task<Stato?> GetStatoByIdAsync(string id, string sessionId)
+    {
+        var sapData = await _sapClient.GetRecordAsync<JsonElement>(StatiTable, id, sessionId);
+        if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
+        return MapToStato(sapData);
     }
 
     public async Task<List<Citta>> GetAllCittaAsync(string sessionId, string? statoId = null)
@@ -40,38 +86,200 @@ public class LookupService : ILookupService
         {
             filter = $"U_StatoId eq '{statoId}'";
         }
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_CITTA", filter, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(CittaTable, filter, sessionId);
         return sapData.Select(MapToCitta).ToList();
+    }
+
+    public async Task<Citta?> GetCittaByIdAsync(string id, string sessionId)
+    {
+        var sapData = await _sapClient.GetRecordAsync<JsonElement>(CittaTable, id, sessionId);
+        if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
+        return MapToCitta(sapData);
+    }
+
+    public async Task<Citta> CreateCittaAsync(Citta citta, string sessionId)
+    {
+        var payload = MapCittaToSap(citta, isUpdate: false);
+        var created = await _sapClient.CreateRecordAsync<JsonElement>(CittaTable, payload, sessionId);
+        return MapToCitta(created);
+    }
+
+    public async Task<Citta> UpdateCittaAsync(string id, Citta citta, string sessionId)
+    {
+        citta.Id = id;
+        var payload = MapCittaToSap(citta, isUpdate: true);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(CittaTable, id, payload, sessionId);
+        return MapToCitta(updated);
+    }
+
+    public async Task DeleteCittaAsync(string id, string sessionId)
+    {
+        await _sapClient.DeleteRecordAsync(CittaTable, id, sessionId);
     }
 
     public async Task<List<TeamTecnico>> GetAllTeamTecniciAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_TEAMTECH", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(TeamTecniciTable, null, sessionId);
         return sapData.Select(MapToTeamTecnico).ToList();
+    }
+
+    public async Task<TeamTecnico?> GetTeamTecnicoByIdAsync(string id, string sessionId)
+    {
+        var sapData = await _sapClient.GetRecordAsync<JsonElement>(TeamTecniciTable, id, sessionId);
+        if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
+        return MapToTeamTecnico(sapData);
+    }
+
+    public async Task<TeamTecnico> CreateTeamTecnicoAsync(TeamTecnico team, string sessionId)
+    {
+        var payload = MapTeamTecnicoToSap(team);
+        var created = await _sapClient.CreateRecordAsync<JsonElement>(TeamTecniciTable, payload, sessionId);
+        return MapToTeamTecnico(created);
+    }
+
+    public async Task<TeamTecnico> UpdateTeamTecnicoAsync(string id, TeamTecnico team, string sessionId)
+    {
+        team.Id = id;
+        var payload = MapTeamTecnicoToSap(team);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(TeamTecniciTable, id, payload, sessionId);
+        return MapToTeamTecnico(updated);
+    }
+
+    public async Task DeleteTeamTecnicoAsync(string id, string sessionId)
+    {
+        await _sapClient.DeleteRecordAsync(TeamTecniciTable, id, sessionId);
     }
 
     public async Task<List<TeamAPL>> GetAllTeamAPLAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_TEAMAPL", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(TeamAPLTable, null, sessionId);
         return sapData.Select(MapToTeamAPL).ToList();
+    }
+
+    public async Task<TeamAPL?> GetTeamAPLByIdAsync(string id, string sessionId)
+    {
+        var sapData = await _sapClient.GetRecordAsync<JsonElement>(TeamAPLTable, id, sessionId);
+        if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
+        return MapToTeamAPL(sapData);
+    }
+
+    public async Task<TeamAPL> CreateTeamAPLAsync(TeamAPL team, string sessionId)
+    {
+        var payload = MapTeamAPLToSap(team);
+        var created = await _sapClient.CreateRecordAsync<JsonElement>(TeamAPLTable, payload, sessionId);
+        return MapToTeamAPL(created);
+    }
+
+    public async Task<TeamAPL> UpdateTeamAPLAsync(string id, TeamAPL team, string sessionId)
+    {
+        team.Id = id;
+        var payload = MapTeamAPLToSap(team);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(TeamAPLTable, id, payload, sessionId);
+        return MapToTeamAPL(updated);
+    }
+
+    public async Task DeleteTeamAPLAsync(string id, string sessionId)
+    {
+        await _sapClient.DeleteRecordAsync(TeamAPLTable, id, sessionId);
     }
 
     public async Task<List<Sales>> GetAllSalesAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_SALES", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(SalesTable, null, sessionId);
         return sapData.Select(MapToSales).ToList();
+    }
+
+    public async Task<Sales?> GetSalesByIdAsync(string id, string sessionId)
+    {
+        var sapData = await _sapClient.GetRecordAsync<JsonElement>(SalesTable, id, sessionId);
+        if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
+        return MapToSales(sapData);
+    }
+
+    public async Task<Sales> CreateSalesAsync(Sales sales, string sessionId)
+    {
+        var payload = MapSalesToSap(sales);
+        var created = await _sapClient.CreateRecordAsync<JsonElement>(SalesTable, payload, sessionId);
+        return MapToSales(created);
+    }
+
+    public async Task<Sales> UpdateSalesAsync(string id, Sales sales, string sessionId)
+    {
+        sales.Id = id;
+        var payload = MapSalesToSap(sales);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(SalesTable, id, payload, sessionId);
+        return MapToSales(updated);
+    }
+
+    public async Task DeleteSalesAsync(string id, string sessionId)
+    {
+        await _sapClient.DeleteRecordAsync(SalesTable, id, sessionId);
     }
 
     public async Task<List<ProjectManager>> GetAllProjectManagersAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PMGR", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(ProjectManagerTable, null, sessionId);
         return sapData.Select(MapToProjectManager).ToList();
+    }
+
+    public async Task<ProjectManager?> GetProjectManagerByIdAsync(string id, string sessionId)
+    {
+        var sapData = await _sapClient.GetRecordAsync<JsonElement>(ProjectManagerTable, id, sessionId);
+        if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
+        return MapToProjectManager(sapData);
+    }
+
+    public async Task<ProjectManager> CreateProjectManagerAsync(ProjectManager manager, string sessionId)
+    {
+        var payload = MapProjectManagerToSap(manager);
+        var created = await _sapClient.CreateRecordAsync<JsonElement>(ProjectManagerTable, payload, sessionId);
+        return MapToProjectManager(created);
+    }
+
+    public async Task<ProjectManager> UpdateProjectManagerAsync(string id, ProjectManager manager, string sessionId)
+    {
+        manager.Id = id;
+        var payload = MapProjectManagerToSap(manager);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(ProjectManagerTable, id, payload, sessionId);
+        return MapToProjectManager(updated);
+    }
+
+    public async Task DeleteProjectManagerAsync(string id, string sessionId)
+    {
+        await _sapClient.DeleteRecordAsync(ProjectManagerTable, id, sessionId);
     }
 
     public async Task<List<SquadraInstallazione>> GetAllSquadreInstallazioneAsync(string sessionId)
     {
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_SQUADRA", null, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(SquadraInstallazioneTable, null, sessionId);
         return sapData.Select(MapToSquadraInstallazione).ToList();
+    }
+
+    public async Task<SquadraInstallazione?> GetSquadraInstallazioneByIdAsync(string id, string sessionId)
+    {
+        var sapData = await _sapClient.GetRecordAsync<JsonElement>(SquadraInstallazioneTable, id, sessionId);
+        if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
+        return MapToSquadraInstallazione(sapData);
+    }
+
+    public async Task<SquadraInstallazione> CreateSquadraInstallazioneAsync(SquadraInstallazione squadra, string sessionId)
+    {
+        var payload = MapSquadraInstallazioneToSap(squadra);
+        var created = await _sapClient.CreateRecordAsync<JsonElement>(SquadraInstallazioneTable, payload, sessionId);
+        return MapToSquadraInstallazione(created);
+    }
+
+    public async Task<SquadraInstallazione> UpdateSquadraInstallazioneAsync(string id, SquadraInstallazione squadra, string sessionId)
+    {
+        squadra.Id = id;
+        var payload = MapSquadraInstallazioneToSap(squadra);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(SquadraInstallazioneTable, id, payload, sessionId);
+        return MapToSquadraInstallazione(updated);
+    }
+
+    public async Task DeleteSquadraInstallazioneAsync(string id, string sessionId)
+    {
+        await _sapClient.DeleteRecordAsync(SquadraInstallazioneTable, id, sessionId);
     }
 
     public async Task<List<ProdottoMaster>> GetAllProdottiMasterAsync(string sessionId, string? categoria = null)
@@ -81,8 +289,35 @@ public class LookupService : ILookupService
         {
             filter = $"U_Categoria eq '{categoria}'";
         }
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>("AX_ADT_PRODMAST", filter, sessionId);
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(ProdottiMasterTable, filter, sessionId);
         return sapData.Select(MapToProdottoMaster).ToList();
+    }
+
+    public async Task<ProdottoMaster?> GetProdottoMasterByIdAsync(string id, string sessionId)
+    {
+        var sapData = await _sapClient.GetRecordAsync<JsonElement>(ProdottiMasterTable, id, sessionId);
+        if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null) return null;
+        return MapToProdottoMaster(sapData);
+    }
+
+    public async Task<ProdottoMaster> CreateProdottoMasterAsync(ProdottoMaster prodotto, string sessionId)
+    {
+        var payload = MapProdottoMasterToSap(prodotto);
+        var created = await _sapClient.CreateRecordAsync<JsonElement>(ProdottiMasterTable, payload, sessionId);
+        return MapToProdottoMaster(created);
+    }
+
+    public async Task<ProdottoMaster> UpdateProdottoMasterAsync(string id, ProdottoMaster prodotto, string sessionId)
+    {
+        prodotto.Id = id;
+        var payload = MapProdottoMasterToSap(prodotto);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(ProdottiMasterTable, id, payload, sessionId);
+        return MapToProdottoMaster(updated);
+    }
+
+    public async Task DeleteProdottoMasterAsync(string id, string sessionId)
+    {
+        await _sapClient.DeleteRecordAsync(ProdottiMasterTable, id, sessionId);
     }
 
     private Cliente MapToCliente(JsonElement sapData)
@@ -273,6 +508,148 @@ public class LookupService : ILookupService
             Descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() : null,
             VariantiDisponibili = varianti.Any() ? varianti : null
         };
+    }
+
+    private object MapClienteToSap(Cliente cliente, bool isUpdate)
+    {
+        var cardCode = string.IsNullOrWhiteSpace(cliente.CardCode) ? cliente.Id : cliente.CardCode;
+        if (string.IsNullOrWhiteSpace(cardCode))
+        {
+            cardCode = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
+        }
+
+        return new
+        {
+            CardCode = cardCode,
+            CardName = cliente.Nome,
+            CardType = "C",
+            EmailAddress = cliente.Email,
+            Phone1 = cliente.Telefono,
+            FederalTaxID = cliente.PartitaIVA,
+            ValidFor = string.IsNullOrWhiteSpace(cliente.ValidFor) ? "Y" : cliente.ValidFor,
+            Notes = cliente.Note,
+            BPAddresses = cliente.Addresses?.Select(a => new
+            {
+                AddressName = a.AddressName,
+                Street = a.Street,
+                City = a.City,
+                Country = a.Country,
+                ZipCode = a.ZipCode
+            }).ToArray()
+        };
+    }
+
+    private object MapCittaToSap(Citta citta, bool isUpdate)
+    {
+        var code = string.IsNullOrWhiteSpace(citta.Id) ? Guid.NewGuid().ToString("N") : citta.Id;
+        return new
+        {
+            Code = code,
+            Name = citta.Nome,
+            U_StatoId = citta.StatoId,
+            U_Cap = citta.Cap,
+            U_Provincia = citta.Provincia,
+            U_Regione = citta.Regione
+        };
+    }
+
+    private object MapTeamTecnicoToSap(TeamTecnico team)
+    {
+        var code = string.IsNullOrWhiteSpace(team.Id) ? Guid.NewGuid().ToString("N") : team.Id;
+        return new
+        {
+            Code = code,
+            Name = team.Nome,
+            U_Specializzazione = team.Specializzazione,
+            U_Email = team.Email,
+            U_Telefono = team.Telefono,
+            U_Disponibilita = team.Disponibilita ? "Y" : "N",
+            U_Membri = SerializeList(team.Membri)
+        };
+    }
+
+    private object MapTeamAPLToSap(TeamAPL team)
+    {
+        var code = string.IsNullOrWhiteSpace(team.Id) ? Guid.NewGuid().ToString("N") : team.Id;
+        return new
+        {
+            Code = code,
+            Name = team.Nome,
+            U_Email = team.Email,
+            U_Telefono = team.Telefono,
+            U_Area = team.Area,
+            U_Competenze = SerializeList(team.Competenze)
+        };
+    }
+
+    private object MapSalesToSap(Sales sales)
+    {
+        var code = string.IsNullOrWhiteSpace(sales.Id) ? Guid.NewGuid().ToString("N") : sales.Id;
+        return new
+        {
+            Code = code,
+            Name = sales.Nome,
+            U_Email = sales.Email,
+            U_Telefono = sales.Telefono,
+            U_Zona = sales.Zona,
+            U_RegioneCompetenza = sales.RegioneDiCompetenza,
+            U_ProgettiGestiti = sales.ProgettiGestiti ?? 0
+        };
+    }
+
+    private object MapProjectManagerToSap(ProjectManager manager)
+    {
+        var code = string.IsNullOrWhiteSpace(manager.Id) ? Guid.NewGuid().ToString("N") : manager.Id;
+        return new
+        {
+            Code = code,
+            Name = manager.Nome,
+            U_Email = manager.Email,
+            U_Telefono = manager.Telefono,
+            U_Esperienza = manager.Esperienza,
+            U_ProgettiAttivi = manager.ProgettiAttivi ?? 0,
+            U_Certificazioni = SerializeList(manager.Certificazioni)
+        };
+    }
+
+    private object MapSquadraInstallazioneToSap(SquadraInstallazione squadra)
+    {
+        var code = string.IsNullOrWhiteSpace(squadra.Id) ? Guid.NewGuid().ToString("N") : squadra.Id;
+        return new
+        {
+            Code = code,
+            Name = squadra.Nome,
+            U_Tipo = squadra.Tipo,
+            U_Contatto = squadra.Contatto,
+            U_Disponibilita = squadra.Disponibilita ? "Y" : "N",
+            U_NumeroMembri = squadra.NumeroMembri ?? 0,
+            U_Competenze = SerializeList(squadra.Competenze)
+        };
+    }
+
+    private object MapProdottoMasterToSap(ProdottoMaster prodotto)
+    {
+        var code = string.IsNullOrWhiteSpace(prodotto.Id) ? Guid.NewGuid().ToString("N") : prodotto.Id;
+        return new
+        {
+            Code = code,
+            Name = prodotto.Nome,
+            U_Categoria = prodotto.Categoria,
+            U_UnitaMisura = prodotto.UnitaMisura,
+            U_CodiceSAP = prodotto.CodiceSAP,
+            U_Descrizione = prodotto.Descrizione,
+            U_Varianti = SerializeList(prodotto.VariantiDisponibili)
+        };
+    }
+
+    private static string? SerializeList(IEnumerable<string>? items)
+    {
+        if (items == null) return null;
+        var cleaned = items
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim());
+        var result = string.Join(',', cleaned);
+        return string.IsNullOrWhiteSpace(result) ? null : result;
     }
 }
 

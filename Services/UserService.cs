@@ -1,0 +1,125 @@
+using System.Text.Json;
+using ADOTTA.Projects.Suite.Api.DTOs;
+
+namespace ADOTTA.Projects.Suite.Api.Services;
+
+public class UserService : IUserService
+{
+    private const string TableName = "AX_ADT_USERS";
+    private readonly ISAPServiceLayerClient _sapClient;
+    private readonly ILogger<UserService> _logger;
+
+    public UserService(ISAPServiceLayerClient sapClient, ILogger<UserService> logger)
+    {
+        _sapClient = sapClient;
+        _logger = logger;
+    }
+
+    public async Task<List<UserDto>> GetUsersAsync(string? query, string sessionId)
+    {
+        string? filter = null;
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var safe = query.Replace("'", "''");
+            filter = $"contains(U_Username, '{safe}') or contains(Name, '{safe}') or contains(U_Email, '{safe}')";
+        }
+
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(TableName, filter, sessionId);
+        return sapData.Select(MapToUserDto).ToList();
+    }
+
+    public async Task<UserDto?> GetUserByIdAsync(int id, string sessionId)
+    {
+        try
+        {
+            var record = await _sapClient.GetRecordAsync<JsonElement>(TableName, id.ToString(), sessionId);
+            if (record.ValueKind == JsonValueKind.Undefined || record.ValueKind == JsonValueKind.Null)
+            {
+                return null;
+            }
+
+            return MapToUserDto(record);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving user {UserId}", id);
+            return null;
+        }
+    }
+
+    public async Task<UserDto?> GetUserByEmailAsync(string email, string sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return null;
+        }
+
+        var safeEmail = email.Replace("'", "''");
+        var filter = $"tolower(U_Email) eq '{safeEmail.ToLowerInvariant()}'";
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(TableName, filter, sessionId);
+        var first = sapData.FirstOrDefault();
+        return first.ValueKind == JsonValueKind.Undefined ? null : MapToUserDto(first);
+    }
+
+    public async Task<UserDto> CreateUserAsync(UserDto user, string sessionId)
+    {
+        var sapPayload = MapToSapRecord(user, isUpdate: false);
+        var created = await _sapClient.CreateRecordAsync<JsonElement>(TableName, sapPayload, sessionId);
+        return MapToUserDto(created);
+    }
+
+    public async Task<UserDto> UpdateUserAsync(int id, UserDto user, string sessionId)
+    {
+        user.Id = id;
+        var sapPayload = MapToSapRecord(user, isUpdate: true);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(TableName, id.ToString(), sapPayload, sessionId);
+        return MapToUserDto(updated);
+    }
+
+    public async Task DeleteUserAsync(int id, string sessionId)
+    {
+        await _sapClient.DeleteRecordAsync(TableName, id.ToString(), sessionId);
+    }
+
+    private UserDto MapToUserDto(JsonElement record)
+    {
+        return new UserDto
+        {
+            Id = record.TryGetProperty("Code", out var codeProp) && int.TryParse(codeProp.GetString(), out var code)
+                ? code
+                : 0,
+            Username = record.TryGetProperty("U_Username", out var username) ? username.GetString() ?? string.Empty : string.Empty,
+            Email = record.TryGetProperty("U_Email", out var email) ? email.GetString() ?? string.Empty : string.Empty,
+            UserName = record.TryGetProperty("Name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
+            Ruolo = record.TryGetProperty("U_Ruolo", out var role) ? role.GetString() ?? string.Empty : string.Empty,
+            TeamTecnico = record.TryGetProperty("U_TeamTecnico", out var team) ? team.GetString() : null,
+            IsActive = record.TryGetProperty("U_IsActive", out var isActive)
+                ? string.Equals(isActive.GetString(), "Y", StringComparison.OrdinalIgnoreCase)
+                : true,
+            Password = null
+        };
+    }
+
+    private object MapToSapRecord(UserDto user, bool isUpdate)
+    {
+        var code = user.Id > 0 ? user.Id.ToString() : Guid.NewGuid().ToString("N");
+        var payload = new Dictionary<string, object?>
+        {
+            ["Code"] = isUpdate ? user.Id.ToString() : code,
+            ["Name"] = user.UserName,
+            ["U_Username"] = user.Username,
+            ["U_Email"] = user.Email,
+            ["U_Ruolo"] = user.Ruolo,
+            ["U_TeamTecnico"] = user.TeamTecnico,
+            ["U_IsActive"] = user.IsActive ? "Y" : "N"
+        };
+
+        if (!string.IsNullOrWhiteSpace(user.Password))
+        {
+            payload["U_Password"] = user.Password;
+        }
+
+        return payload;
+    }
+}
+

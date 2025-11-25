@@ -13,5 +13,9 @@ public interface ITimesheetService
     Task<TimesheetOverviewDto> GetOverviewAsync(string? fromDate, string? toDate, string? utente, string sessionId);
     Task<TimesheetSummaryDto> GetSummaryAsync(string? fromDate, string? toDate, string? utente, string sessionId);
     Task<List<TimesheetEntryDto>> GetEntriesByUserAsync(string utente, string sessionId);
+    Task<List<TimesheetEntryDto>> GetEntriesByDateRangeAsync(DateTime? startDate, DateTime? endDate, string sessionId);
+    Task<List<TimesheetProjectStatsDto>> GetStatsByProjectAsync(string sessionId);
+    Task<List<TimesheetUserStatsDto>> GetStatsByUserAsync(string sessionId);
+    Task<List<TimesheetDailyStatsDto>> GetDailyStatsAsync(DateTime date, string sessionId);
 }
 
