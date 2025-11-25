@@ -1,11 +1,14 @@
 using ADOTTA.Projects.Suite.Api.Models.Lookup;
 using ADOTTA.Projects.Suite.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using ADOTTA.Projects.Suite.Api.Extensions;
 
 namespace ADOTTA.Projects.Suite.Api.Controllers;
 
 [ApiController]
 [Route("api/lookup")]
+[Authorize]
 public class LookupController : ControllerBase
 {
     private readonly ILookupService _lookupService;
@@ -17,10 +20,7 @@ public class LookupController : ControllerBase
         _logger = logger;
     }
 
-    private string GetSessionId()
-    {
-        return Request.Headers["X-SAP-Session-Id"].ToString() ?? "";
-    }
+    private string GetSessionId() => HttpContext.GetSapSessionId();
 
     #region Clienti
 

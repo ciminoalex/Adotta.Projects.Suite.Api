@@ -1,11 +1,14 @@
 using ADOTTA.Projects.Suite.Api.DTOs;
 using ADOTTA.Projects.Suite.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using ADOTTA.Projects.Suite.Api.Extensions;
 
 namespace ADOTTA.Projects.Suite.Api.Controllers;
 
 [ApiController]
 [Route("api/users")]
+[Authorize]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -17,7 +20,7 @@ public class UsersController : ControllerBase
         _logger = logger;
     }
 
-    private string GetSessionId() => Request.Headers["X-SAP-Session-Id"].ToString() ?? string.Empty;
+    private string GetSessionId() => HttpContext.GetSapSessionId();
 
     [HttpGet]
     public async Task<ActionResult<List<UserDto>>> GetAll([FromQuery] string? q)

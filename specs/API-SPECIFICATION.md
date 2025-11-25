@@ -80,13 +80,17 @@ var sessionId = Request.Headers["X-SAP-Session-Id"];
 httpClient.DefaultRequestHeaders.Add("Cookie", $"B1SESSION={sessionId}");
 ```
 
-**Flusso Autenticazione:**
-1. Frontend chiama l'API di login → API rimanda le credenziali a SAP Service Layer
-2. SAP Service Layer autentica e restituisce SessionId
-3. API restituisce SessionId al frontend
-4. Frontend include SessionId in tutte le richieste successive
-5. API propaga SessionId al Service Layer per operazioni sui dati
-6. Al logout, SessionId viene invalidato
+> **Aggiornamento 2025-11**  
+> Il token di sessione SAP viene ora gestito dall'API e serializzato nei JWT rilasciati al client.  
+> Il frontend non deve più passare `X-SAP-Session-Id`; tutte le chiamate protette devono inviare `Authorization: Bearer {token}`.
+
+**Flusso Autenticazione (revisione 2025-11):**
+1. Frontend invia email/password all'endpoint `POST /api/auth/login`
+2. L'API effettua il login tecnico sul Service Layer e verifica l'utente nella tabella `AX_ADT_USERS`
+3. Viene generato un JWT che include le informazioni utente e la sessione SAP
+4. Il frontend salva il JWT e lo invia negli header `Authorization` per ogni richiesta protetta
+5. L'API estrae il `SessionId` dal token e lo utilizza verso il Service Layer
+6. `POST /api/auth/logout` invalida la sessione SAP e il JWT lato client
 
 ---
 

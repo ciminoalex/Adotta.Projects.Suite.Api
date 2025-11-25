@@ -2,11 +2,14 @@ using ADOTTA.Projects.Suite.Api.DTOs;
 using ADOTTA.Projects.Suite.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
+using ADOTTA.Projects.Suite.Api.Extensions;
 
 namespace ADOTTA.Projects.Suite.Api.Controllers;
 
 [ApiController]
 [Route("api/timesheet")]
+[Authorize]
 public class TimesheetController : ControllerBase
 {
     private readonly ITimesheetService _timesheetService;
@@ -18,10 +21,7 @@ public class TimesheetController : ControllerBase
         _logger = logger;
     }
 
-    private string GetSessionId()
-    {
-        return Request.Headers["X-SAP-Session-Id"].ToString() ?? "";
-    }
+    private string GetSessionId() => HttpContext.GetSapSessionId();
 
     [HttpGet]
     public async Task<ActionResult<List<TimesheetEntryDto>>> GetAll()

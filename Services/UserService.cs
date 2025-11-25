@@ -25,7 +25,7 @@ public class UserService : IUserService
         }
 
         var sapData = await _sapClient.GetRecordsAsync<JsonElement>(TableName, filter, sessionId);
-        return sapData.Select(MapToUserDto).ToList();
+        return sapData.Select(record => MapToUserDto(record)).ToList();
     }
 
     public async Task<UserDto?> GetUserByIdAsync(int id, string sessionId)
@@ -47,7 +47,7 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<UserDto?> GetUserByEmailAsync(string email, string sessionId)
+    public async Task<UserDto?> GetUserByEmailAsync(string email, string sessionId, bool includeSensitive = false)
     {
         if (string.IsNullOrWhiteSpace(email))
         {
@@ -58,7 +58,7 @@ public class UserService : IUserService
         var filter = $"tolower(U_Email) eq '{safeEmail.ToLowerInvariant()}'";
         var sapData = await _sapClient.GetRecordsAsync<JsonElement>(TableName, filter, sessionId);
         var first = sapData.FirstOrDefault();
-        return first.ValueKind == JsonValueKind.Undefined ? null : MapToUserDto(first);
+        return first.ValueKind == JsonValueKind.Undefined ? null : MapToUserDto(first, includeSensitive);
     }
 
     public async Task<UserDto> CreateUserAsync(UserDto user, string sessionId)
@@ -81,7 +81,7 @@ public class UserService : IUserService
         await _sapClient.DeleteRecordAsync(TableName, id.ToString(), sessionId);
     }
 
-    private UserDto MapToUserDto(JsonElement record)
+    private UserDto MapToUserDto(JsonElement record, bool includeSensitive = false)
     {
         return new UserDto
         {
@@ -96,7 +96,9 @@ public class UserService : IUserService
             IsActive = record.TryGetProperty("U_IsActive", out var isActive)
                 ? string.Equals(isActive.GetString(), "Y", StringComparison.OrdinalIgnoreCase)
                 : true,
-            Password = null
+            Password = includeSensitive && record.TryGetProperty("U_Password", out var password)
+                ? password.GetString()
+                : null
         };
     }
 

@@ -126,12 +126,13 @@ Vedi `specs/API-SPECIFICATION.md` per la documentazione completa.
 
 ## Autenticazione
 
-L'API utilizza l'autenticazione nativa di SAP Business One Service Layer:
+L'API ora utilizza token JWT per gestire l'identità dell'utente e propagare in sicurezza la sessione SAP lato server:
 
-1. Effettua login tramite `POST /api/auth/login`
-2. Ricevi il `SessionId` nella risposta
-3. Includi `SessionId` in tutte le richieste successive come header: `X-SAP-Session-Id`
-4. Esegui logout tramite `POST /api/auth/logout`
+1. Effettua login tramite `POST /api/auth/login` inviando `email` e `password`
+2. Ricevi in risposta un oggetto `LoginResponseDto` contenente il token JWT (`token`) e i dati dell'utente
+3. Includi il token in tutte le richieste protette tramite header `Authorization: Bearer {token}`
+4. La sessione SAP (`X-SAP-Session-Id`) viene estratta automaticamente dal token e non deve più essere inviata dal client
+5. Esegui logout tramite `POST /api/auth/logout` (richiede il token attivo)
 
 ## Logging
 

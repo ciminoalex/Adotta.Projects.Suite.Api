@@ -1,6 +1,7 @@
 # ADOTTA Projects Suite – API Addendum (Frontend Compatibility)
 
-Documento di riferimento per allineare il backend .NET/Service Layer agli schemi e alle rotte realmente utilizzate dalla WebApp Angular. Tutte le risposte devono essere JSON (`application/json`) e includere l'header `X-SAP-Session-Id` per la propagazione della sessione SAP, salvo gli endpoint di login.
+Documento di riferimento per allineare il backend .NET/Service Layer agli schemi e alle rotte realmente utilizzate dalla WebApp Angular. Tutte le risposte devono essere JSON (`application/json`).  
+**Aggiornamento 2025-11**: l'autenticazione avviene tramite token JWT (`Authorization: Bearer {token}`). L'header `X-SAP-Session-Id` viene gestito automaticamente dall'API e non deve più essere inviato dal client, restando presente solo per retro-compatibilità in risposta.
 
 ## Convenzioni
 
@@ -17,22 +18,30 @@ Documento di riferimento per allineare il backend .NET/Service Layer agli schemi
 - **Request** (`LoginRequestDto` – già in swagger):
   ```json
   {
-    "companyDB": "SBODEMOUS",
-    "userName": "manager",
-    "password": "Password1"
+    "email": "utente@example.com",
+    "password": "P@ssw0rd!"
   }
   ```
 - **Response** (`LoginResponseDto`):
   ```json
   {
-    "sessionId": "CA4B81FF-5DD9-4916-9FBF-DD0F4CFC9A72",
-    "version": "10.00.140",
-    "sessionTimeout": 30
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresAt": "2025-11-25T10:15:30Z",
+    "expiresInSeconds": 3600,
+    "user": {
+      "id": 123,
+      "username": "usr",
+      "email": "utente@example.com",
+      "userName": "Mario Rossi",
+      "ruolo": "PM",
+      "teamTecnico": "T1",
+      "isActive": true
+    }
   }
   ```
 
 ### `POST /api/Auth/logout`
-- **Request**: header `X-SAP-Session-Id`.
+- **Request**: header `Authorization: Bearer {token}`.
 - **Response**: `204 No Content` (nessun body).
 
 ### `GET /api/Auth/users/by-email/{email}`

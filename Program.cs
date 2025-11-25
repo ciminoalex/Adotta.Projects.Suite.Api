@@ -8,6 +8,9 @@ using Serilog;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Rewrite;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,24 +31,58 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "ADOTTA Projects Suite API", Version = "v1" });
 
-    var sessionScheme = new OpenApiSecurityScheme
+    var jwtScheme = new OpenApiSecurityScheme
     {
-        Name = "X-SAP-Session-Id",
-        Description = "Inserisci il SessionId di SAP Business One",
+        Name = "Authorization",
+        Description = "Inserisci il token JWT come: Bearer {token}",
         In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Session" }
+        Type = SecuritySchemeType.Http,
+        Scheme = JwtBearerDefaults.AuthenticationScheme,
+        BearerFormat = "JWT",
+        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
     };
 
-    c.AddSecurityDefinition("Session", sessionScheme);
+    c.AddSecurityDefinition("Bearer", jwtScheme);
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
-        { sessionScheme, new List<string>() }
+        { jwtScheme, new List<string>() }
     });
 });
 
-// Configure SAP Settings
+// Configure Settings
 builder.Services.Configure<SAPSettings>(builder.Configuration.GetSection("SAPSettings"));
+builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
+
+var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>() ?? new JwtSettings();
+if (string.IsNullOrWhiteSpace(jwtSettings.Secret))
+{
+    throw new InvalidOperationException("JwtSettings:Secret must be configured.");
+}
+
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret));
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateIssuerSigningKey = true,
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.FromMinutes(1),
+        ValidIssuer = jwtSettings.Issuer,
+        ValidAudience = jwtSettings.Audience,
+        IssuerSigningKey = signingKey
+    };
+});
+
+builder.Services.AddAuthorization();
 
 // Register services
 builder.Services.AddHttpClient<ISAPServiceLayerClient, SAPServiceLayerClient>()
@@ -80,6 +117,8 @@ builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<ITimesheetService, TimesheetService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IInitializationService, InitializationService>();
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddHttpContextAccessor();
 
 // Register validators
 builder.Services.AddValidatorsFromAssemblyContaining<ProjectValidator>();
@@ -188,10 +227,11 @@ app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
-app.UseMiddleware<SAPSessionMiddleware>();
 
 app.UseCors("AllowAngularApp");
 
+app.UseAuthentication();
+app.UseMiddleware<SAPSessionMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();

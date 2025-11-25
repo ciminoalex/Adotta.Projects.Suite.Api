@@ -1,10 +1,13 @@
 using ADOTTA.Projects.Suite.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using ADOTTA.Projects.Suite.Api.Extensions;
 
 namespace ADOTTA.Projects.Suite.Api.Controllers;
 
 [ApiController]
 [Route("api/init")]
+[Authorize]
 public class InitializationController : ControllerBase
 {
     private readonly IInitializationService _initService;
@@ -19,10 +22,10 @@ public class InitializationController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Initialize()
     {
-        var sessionId = HttpContext.Items["SAPSessionId"] as string ?? string.Empty;
+        var sessionId = HttpContext.GetSapSessionId();
         if (string.IsNullOrEmpty(sessionId))
         {
-            return BadRequest("Missing X-SAP-Session-Id header");
+            return BadRequest("Sessione SAP non disponibile");
         }
 
         var result = await _initService.InitializeAsync(sessionId);

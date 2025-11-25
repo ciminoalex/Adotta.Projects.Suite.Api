@@ -1,3 +1,5 @@
+using ADOTTA.Projects.Suite.Api.Constants;
+
 namespace ADOTTA.Projects.Suite.Api.Middleware;
 
 public class SAPSessionMiddleware
@@ -13,8 +15,13 @@ public class SAPSessionMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Estrai SessionId dal header
-        var sessionId = context.Request.Headers["X-SAP-Session-Id"].ToString();
+        var sessionId = context.User?.Claims.FirstOrDefault(c =>
+            string.Equals(c.Type, SapClaimTypes.SessionId, StringComparison.OrdinalIgnoreCase))?.Value;
+
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            sessionId = context.Request.Headers["X-SAP-Session-Id"].ToString();
+        }
 
         // Aggiungi SessionId al context per uso downstream
         if (!string.IsNullOrWhiteSpace(sessionId))

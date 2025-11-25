@@ -5,11 +5,14 @@ using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
+using Microsoft.AspNetCore.Authorization;
+using ADOTTA.Projects.Suite.Api.Extensions;
 
 namespace ADOTTA.Projects.Suite.Api.Controllers;
 
 [ApiController]
 [Route("api/projects")]
+[Authorize]
 public class ProjectsController : ControllerBase
 {
     private readonly IProjectService _projectService;
@@ -23,10 +26,7 @@ public class ProjectsController : ControllerBase
         _serviceProvider = serviceProvider;
     }
 
-    private string GetSessionId()
-    {
-        return Request.Headers["X-SAP-Session-Id"].ToString() ?? "";
-    }
+    private string GetSessionId() => HttpContext.GetSapSessionId();
 
     [HttpGet]
     public async Task<ActionResult<List<ProjectDto>>> GetAll()
