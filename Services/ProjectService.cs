@@ -84,6 +84,14 @@ public class ProjectService : IProjectService
     {
         var sapUDO = ProjectMapper.MapProjectToSapUDO(project);
         var result = await _sapClient.UpdateRecordAsync<JsonElement>(ProjectTable, numeroProgetto, sapUDO, sessionId);
+        
+        // SAP returns 204 No Content on PATCH, so re-fetch the updated project
+        if (result.ValueKind == JsonValueKind.Undefined || result.ValueKind == JsonValueKind.Null)
+        {
+            var updated = await GetProjectByCodeAsync(numeroProgetto, sessionId);
+            return updated ?? throw new InvalidOperationException($"Project {numeroProgetto} not found after update");
+        }
+        
         return ProjectMapper.MapSapUDOToProject(result);
     }
 
@@ -96,6 +104,14 @@ public class ProjectService : IProjectService
         }
 
         var result = await _sapClient.UpdateRecordAsync<JsonElement>(ProjectTable, numeroProgetto, payload, sessionId);
+        
+        // SAP returns 204 No Content on PATCH, so re-fetch the updated project
+        if (result.ValueKind == JsonValueKind.Undefined || result.ValueKind == JsonValueKind.Null)
+        {
+            var updated = await GetProjectByCodeAsync(numeroProgetto, sessionId);
+            return updated ?? throw new InvalidOperationException($"Project {numeroProgetto} not found after patch");
+        }
+        
         return ProjectMapper.MapSapUDOToProject(result);
     }
 

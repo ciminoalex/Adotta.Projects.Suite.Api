@@ -10,32 +10,60 @@ public static class ProjectMapper
 {
     public static object MapProjectToSapUDO(ProjectDto dto)
     {
-        return new
+        var result = new Dictionary<string, object?>
         {
-            Code = dto.NumeroProgetto,
-            Name = dto.NomeProgetto,
-            U_Cliente = dto.Cliente,
-            U_Citta = dto.Citta,
-            U_Stato = dto.Stato,
-            U_TeamTecnico = dto.TeamTecnico ?? "",
-            U_TeamAPL = dto.TeamAPL ?? "",
-            U_Sales = dto.Sales ?? "",
-            U_ProjectManager = dto.ProjectManager ?? "",
-            U_TeamInstallazione = dto.TeamInstallazione ?? "",
-            U_DataCreazione = dto.DataCreazione.ToString("yyyy-MM-ddTHH:mm:ss"),
-            U_DataInizioInstall = dto.DataInizioInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
-            U_DataFineInstall = dto.DataFineInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
-            U_VersioneWIC = dto.VersioneWIC ?? "",
-            U_UltimaModifica = dto.UltimaModifica?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss"),
-            U_StatoProgetto = dto.StatoProgetto.ToString(),
-            U_ValoreProgetto = dto.ValoreProgetto ?? 0,
-            U_MarginePrevisto = dto.MarginePrevisto ?? 0,
-            U_CostiSostenuti = dto.CostiSostenuti ?? 0,
-            U_Note = dto.Note ?? "",
-            U_IsInRitardo = dto.IsInRitardo ? "Y" : "N",
-            U_QtaTotaleMq = dto.QuantitaTotaleMq ?? 0,
-            U_QtaTotaleFt = dto.QuantitaTotaleFt ?? 0
+            ["Code"] = dto.NumeroProgetto,
+            ["Name"] = dto.NomeProgetto,
+            ["U_Cliente"] = dto.Cliente,
+            ["U_Citta"] = dto.Citta,
+            ["U_Stato"] = dto.Stato,
+            ["U_TeamTecnico"] = dto.TeamTecnico ?? "",
+            ["U_TeamAPL"] = dto.TeamAPL ?? "",
+            ["U_Sales"] = dto.Sales ?? "",
+            ["U_ProjectManager"] = dto.ProjectManager ?? "",
+            ["U_TeamInstallazione"] = dto.TeamInstallazione ?? "",
+            ["U_DataCreazione"] = dto.DataCreazione.ToString("yyyy-MM-ddTHH:mm:ss"),
+            ["U_DataInizioInstall"] = dto.DataInizioInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
+            ["U_DataFineInstall"] = dto.DataFineInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
+            ["U_VersioneWIC"] = dto.VersioneWIC ?? "",
+            ["U_UltimaModifica"] = dto.UltimaModifica?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss"),
+            ["U_StatoProgetto"] = dto.StatoProgetto.ToString(),
+            ["U_ValoreProgetto"] = dto.ValoreProgetto ?? 0,
+            ["U_MarginePrevisto"] = dto.MarginePrevisto ?? 0,
+            ["U_CostiSostenuti"] = dto.CostiSostenuti ?? 0,
+            ["U_Note"] = dto.Note ?? "",
+            ["U_IsInRitardo"] = dto.IsInRitardo ? "Y" : "N",
+            ["U_QtaTotaleMq"] = dto.QuantitaTotaleMq ?? 0,
+            ["U_QtaTotaleFt"] = dto.QuantitaTotaleFt ?? 0
         };
+
+        // Include child collections for SAP UDO
+        // Note: SAP UDO child tables only support U_ prefixed fields, not Name/Code
+        if (dto.Livelli != null && dto.Livelli.Count > 0)
+        {
+            result["AX_ADT_PROJLVLCollection"] = dto.Livelli.Select((l, idx) => new
+            {
+                U_Ordine = l.Ordine > 0 ? l.Ordine : idx + 1,
+                U_Descrizione = !string.IsNullOrEmpty(l.Nome) ? $"{l.Nome} - {l.Descrizione ?? ""}" : (l.Descrizione ?? ""),
+                U_DataInizio = l.DataInizioInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
+                U_DataFine = l.DataFineInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
+                U_DataCaricamento = l.DataCaricamento?.ToString("yyyy-MM-ddTHH:mm:ss") ?? ""
+            }).ToList();
+        }
+
+        if (dto.Prodotti != null && dto.Prodotti.Count > 0)
+        {
+            result["AX_ADT_PROPRDCollection"] = dto.Prodotti.Select(p => new
+            {
+                U_TipoProdotto = p.TipoProdotto,
+                U_Variante = p.Variante,
+                U_QMq = p.QMq,
+                U_QFt = p.QFt,
+                U_LivelloId = p.LivelloId?.ToString() ?? ""
+            }).ToList();
+        }
+
+        return result;
     }
 
     public static ProjectDto MapSapUDOToProject(JsonElement sapData)
