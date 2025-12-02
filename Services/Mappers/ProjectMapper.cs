@@ -39,11 +39,20 @@ public static class ProjectMapper
 
         // Include child collections for SAP UDO
         // Note: SAP UDO child tables only support Code and U_ prefixed fields in collections
+        // Child collections for the AX_ADT_PROJECT UDO must use the same schema
+        // that the Service Layer expects for UDO child tables:
+        // - Code      : parent UDO code (project number)
+        // - LineId    : progressive row number
+        // - Object    : UDO object code (AX_ADT_PROJECT)
+        // - LogInst   : can be null for PATCH
         if (dto.Livelli != null && dto.Livelli.Count > 0)
         {
             result["AX_ADT_PROJLVLCollection"] = dto.Livelli.Select((l, idx) => new
             {
-                Code = l.Id > 0 ? $"{dto.NumeroProgetto}-L{l.Id}" : $"{dto.NumeroProgetto}-L{idx + 1}",
+                Code = dto.NumeroProgetto,
+                LineId = l.Id > 0 ? l.Id : idx + 1,
+                Object = "AX_ADT_PROJECT",
+                LogInst = (int?)null,
                 U_Parent = dto.NumeroProgetto,
                 U_Ordine = l.Ordine > 0 ? l.Ordine : idx + 1,
                 U_Nome = l.Nome ?? "",
@@ -58,7 +67,10 @@ public static class ProjectMapper
         {
             result["AX_ADT_PROPRDCollection"] = dto.Prodotti.Select((p, idx) => new
             {
-                Code = p.Id > 0 ? $"{dto.NumeroProgetto}-P{p.Id}" : $"{dto.NumeroProgetto}-P{idx + 1}",
+                Code = dto.NumeroProgetto,
+                LineId = p.Id > 0 ? p.Id : idx + 1,
+                Object = "AX_ADT_PROJECT",
+                LogInst = (int?)null,
                 U_Parent = dto.NumeroProgetto,
                 U_TipoProdotto = p.TipoProdotto,
                 U_Variante = p.Variante,
