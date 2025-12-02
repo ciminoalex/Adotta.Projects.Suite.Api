@@ -38,13 +38,16 @@ public static class ProjectMapper
         };
 
         // Include child collections for SAP UDO
-        // Note: SAP UDO child tables only support U_ prefixed fields, not Name/Code
+        // Note: SAP UDO child tables only support Code and U_ prefixed fields in collections
         if (dto.Livelli != null && dto.Livelli.Count > 0)
         {
             result["AX_ADT_PROJLVLCollection"] = dto.Livelli.Select((l, idx) => new
             {
+                Code = l.Id > 0 ? $"{dto.NumeroProgetto}-L{l.Id}" : $"{dto.NumeroProgetto}-L{idx + 1}",
+                U_Parent = dto.NumeroProgetto,
                 U_Ordine = l.Ordine > 0 ? l.Ordine : idx + 1,
-                U_Descrizione = !string.IsNullOrEmpty(l.Nome) ? $"{l.Nome} - {l.Descrizione ?? ""}" : (l.Descrizione ?? ""),
+                U_Nome = l.Nome ?? "",
+                U_Descrizione = l.Descrizione ?? "",
                 U_DataInizio = l.DataInizioInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
                 U_DataFine = l.DataFineInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
                 U_DataCaricamento = l.DataCaricamento?.ToString("yyyy-MM-ddTHH:mm:ss") ?? ""
@@ -53,8 +56,10 @@ public static class ProjectMapper
 
         if (dto.Prodotti != null && dto.Prodotti.Count > 0)
         {
-            result["AX_ADT_PROPRDCollection"] = dto.Prodotti.Select(p => new
+            result["AX_ADT_PROPRDCollection"] = dto.Prodotti.Select((p, idx) => new
             {
+                Code = p.Id > 0 ? $"{dto.NumeroProgetto}-P{p.Id}" : $"{dto.NumeroProgetto}-P{idx + 1}",
+                U_Parent = dto.NumeroProgetto,
                 U_TipoProdotto = p.TipoProdotto,
                 U_Variante = p.Variante,
                 U_QMq = p.QMq,
@@ -160,13 +165,44 @@ public static class ProjectMapper
             }
         }
 
+        // Try to get nome from U_Nome field first, then from Name, then extract from descrizione for backward compatibility
+        var nome = "";
+        var descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() : null;
+        
+        if (sapData.TryGetProperty("U_Nome", out var uNome) && !string.IsNullOrWhiteSpace(uNome.GetString()))
+        {
+            nome = uNome.GetString() ?? "";
+        }
+        else if (sapData.TryGetProperty("Name", out var name) && !string.IsNullOrWhiteSpace(name.GetString()))
+        {
+            nome = name.GetString() ?? "";
+        }
+        else
+        {
+            // Backward compatibility: try to extract nome from descrizione if format is "Nome - Descrizione"
+            if (!string.IsNullOrEmpty(descrizione) && descrizione.Contains(" - "))
+            {
+                var parts = descrizione.Split(new[] { " - " }, 2, StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    nome = parts[0];
+                }
+            }
+        }
+
+        // If descrizione contains " - " and we extracted nome, remove nome from descrizione
+        if (!string.IsNullOrEmpty(descrizione) && !string.IsNullOrEmpty(nome) && descrizione.StartsWith(nome + " - "))
+        {
+            descrizione = descrizione.Substring(nome.Length + 3);
+        }
+
         return new LivelloProgettoDto
         {
             Id = id,
             NumeroProgetto = numeroProgetto,
-            Nome = sapData.TryGetProperty("Name", out var name) ? name.GetString() ?? "" : "",
+            Nome = nome,
             Ordine = sapData.TryGetProperty("U_Ordine", out var order) ? order.GetInt32() : 0,
-            Descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() : null,
+            Descrizione = descrizione,
             DataInizioInstallazione = sapData.TryGetProperty("U_DataInizio", out var start) && DateTime.TryParse(start.GetString(), out var dtStart) ? dtStart : null,
             DataFineInstallazione = sapData.TryGetProperty("U_DataFine", out var end) && DateTime.TryParse(end.GetString(), out var dtEnd) ? dtEnd : null,
             DataCaricamento = sapData.TryGetProperty("U_DataCaricamento", out var load) && DateTime.TryParse(load.GetString(), out var dtLoad) ? dtLoad : null
@@ -209,6 +245,7 @@ public static class ProjectMapper
             Name = dto.Nome,
             U_Parent = numeroProgetto,
             U_Ordine = dto.Ordine,
+            U_Nome = dto.Nome ?? "",
             U_Descrizione = dto.Descrizione ?? "",
             U_DataInizio = dto.DataInizioInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
             U_DataFine = dto.DataFineInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",

@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Text.Json;
+using ADOTTA.Projects.Suite.Api.DTOs;
 using ADOTTA.Projects.Suite.Api.Models.Lookup;
 
 namespace ADOTTA.Projects.Suite.Api.Services;
@@ -29,6 +30,29 @@ public class LookupService : ILookupService
     {
         var sapData = await _sapClient.GetRecordsAsync<JsonElement>(BusinessPartnersTable, "CardType eq 'C'", sessionId);
         return sapData.Select(MapToCliente).ToList();
+    }
+
+    public async Task<PagedResultDto<Cliente>> GetClientiPagedAsync(string sessionId, int page = 1, int pageSize = 20, string? search = null)
+    {
+        var skip = (page - 1) * pageSize;
+        var filter = "CardType eq 'C'";
+        
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var safeSearch = search.Replace("'", "''");
+            filter += $" and (contains(CardCode, '{safeSearch}') or contains(CardName, '{safeSearch}') or contains(EmailAddress, '{safeSearch}'))";
+        }
+
+        var (sapData, totalCount) = await _sapClient.GetRecordsPagedAsync<JsonElement>(BusinessPartnersTable, skip, pageSize, filter, sessionId);
+        var clienti = sapData.Select(MapToCliente).ToList();
+
+        return new PagedResultDto<Cliente>
+        {
+            Items = clienti,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     public async Task<Cliente?> GetClienteByIdAsync(string id, string sessionId)
@@ -70,6 +94,21 @@ public class LookupService : ILookupService
     {
         var sapData = await _sapClient.GetRecordsAsync<JsonElement>(StatiTable, null, sessionId);
         return sapData.Select(MapToStato).ToList();
+    }
+
+    public async Task<PagedResultDto<Stato>> GetStatiPagedAsync(string sessionId, int page = 1, int pageSize = 20)
+    {
+        var skip = (page - 1) * pageSize;
+        var (sapData, totalCount) = await _sapClient.GetRecordsPagedAsync<JsonElement>(StatiTable, skip, pageSize, null, sessionId);
+        var stati = sapData.Select(MapToStato).ToList();
+
+        return new PagedResultDto<Stato>
+        {
+            Items = stati,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     public async Task<Stato?> GetStatoByIdAsync(string id, string sessionId)

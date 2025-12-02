@@ -228,13 +228,170 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
     {
         try
         {
+            var allRecords = new List<T>();
+            var skip = 0;
+            const int maxPageSize = 50000; // Dimensione massima della pagina usando l'header Prefer
+            var hasMore = true;
+
+            while (hasMore)
+            {
+                var url = tableName;
+                var queryParams = new List<string>();
+                
+                if (!string.IsNullOrEmpty(filter))
+                {
+                    queryParams.Add($"$filter={Uri.EscapeDataString(filter)}");
+                }
+                
+                // Usa $skip per la paginazione
+                queryParams.Add($"$skip={skip}");
+                
+                if (queryParams.Any())
+                {
+                    url += "?" + string.Join("&", queryParams);
+                }
+
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                
+                // Aggiungi l'header Prefer per impostare il maxpagesize
+                request.Headers.Add("Prefer", "odata.maxpagesize=50000");
+                
+                if (!string.IsNullOrEmpty(sessionId))
+                {
+                    var cookieHeader = BuildCookieHeader(sessionId);
+                    if (!string.IsNullOrEmpty(cookieHeader))
+                    {
+                        request.Headers.Add("Cookie", cookieHeader);
+                    }
+                }
+
+                var fullUrl = _httpClient.BaseAddress != null ? new Uri(_httpClient.BaseAddress, url).ToString() : url;
+                _logger.LogDebug("SAP GET relative URL: {RelativeUrl}, full URL: {FullUrl}, skip: {Skip}, maxpagesize: {MaxPageSize}", url, fullUrl, skip, maxPageSize);
+                var response = await _httpClient.SendAsync(request);
+                
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    break;
+                }
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("SAP GET failed. Relative URL: {RelativeUrl}, Full URL: {FullUrl}, Status: {Status}, Body: {Body}", url, fullUrl, response.StatusCode, errorBody);
+                    var ex = new HttpRequestException($"SAP GET {url} failed. Status: {response.StatusCode}. Body: {errorBody}");
+                    ex.Data["StatusCode"] = response.StatusCode;
+                    throw ex;
+                }
+
+                var jsonDoc = await response.Content.ReadFromJsonAsync<JsonDocument>();
+                if (jsonDoc != null)
+                {
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    List<T>? batchRecords = null;
+                    
+                    // Check if it's OData format with "value" property
+                    if (jsonDoc.RootElement.TryGetProperty("value", out var valueArray))
+                    {
+                        batchRecords = JsonSerializer.Deserialize<List<T>>(valueArray.GetRawText(), options);
+                        
+                        // Verifica se c'è un link "next" per la paginazione OData
+                        if (jsonDoc.RootElement.TryGetProperty("odata.nextLink", out var nextLink) || 
+                            jsonDoc.RootElement.TryGetProperty("@odata.nextLink", out nextLink))
+                        {
+                            // C'è un link next, quindi ci sono altri record
+                            hasMore = batchRecords != null && batchRecords.Count > 0;
+                        }
+                        else
+                        {
+                            // Nessun link next, verifica se abbiamo ricevuto esattamente maxPageSize record
+                            hasMore = batchRecords != null && batchRecords.Count == maxPageSize;
+                        }
+                    }
+                    // Check if it's a direct array (UDO format)
+                    else if (jsonDoc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        batchRecords = JsonSerializer.Deserialize<List<T>>(jsonDoc.RootElement.GetRawText(), options);
+                        // Per gli array diretti, verifica se abbiamo ricevuto esattamente maxPageSize record
+                        hasMore = batchRecords != null && batchRecords.Count == maxPageSize;
+                    }
+                    
+                    if (batchRecords != null && batchRecords.Count > 0)
+                    {
+                        allRecords.AddRange(batchRecords);
+                        _logger.LogDebug("Recuperati {Count} record, totale accumulato: {Total}", batchRecords.Count, allRecords.Count);
+                        
+                        // Se riceviamo sempre 20 record (limite default del Service Layer), continuiamo a paginare
+                        // fino a quando non riceviamo meno di 20 record o non ci sono più record nuovi
+                        var previousCount = allRecords.Count - batchRecords.Count;
+                        skip += batchRecords.Count;
+                        
+                        // Se riceviamo esattamente maxPageSize record, potrebbero esserci altri record
+                        if (batchRecords.Count == maxPageSize)
+                        {
+                            // Continua a paginare, ma limita a un massimo di iterazioni per evitare loop infiniti
+                            var maxIterations = 10; // Massimo 10 iterazioni = 500000 record
+                            hasMore = (skip / maxPageSize) < maxIterations;
+                            _logger.LogDebug("Ricevuti {MaxPageSize} record (maxpagesize), continuo paginazione con skip={Skip}", maxPageSize, skip);
+                        }
+                        else if (batchRecords.Count < maxPageSize)
+                        {
+                            _logger.LogDebug("Ricevuti meno di {MaxPageSize} record ({Count}), fine paginazione", maxPageSize, batchRecords.Count);
+                            hasMore = false;
+                        }
+                        else
+                        {
+                            hasMore = true;
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogDebug("Nessun record ricevuto, fine paginazione");
+                        hasMore = false;
+                    }
+                }
+                else
+                {
+                    hasMore = false;
+                }
+            }
+
+            return allRecords;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting records from SAP for table: {TableName}", tableName);
+            throw;
+        }
+    }
+
+    public async Task<(List<T> Items, int TotalCount)> GetRecordsPagedAsync<T>(string tableName, int skip, int top, string? filter = null, string sessionId = "")
+    {
+        try
+        {
             var url = tableName;
+            var queryParams = new List<string>();
+            
             if (!string.IsNullOrEmpty(filter))
             {
-                url += $"?$filter={Uri.EscapeDataString(filter)}";
+                queryParams.Add($"$filter={Uri.EscapeDataString(filter)}");
+            }
+            
+            // Aggiungi $skip e $top per la paginazione
+            queryParams.Add($"$skip={skip}");
+            queryParams.Add($"$top={top}");
+            
+            // Aggiungi $count per ottenere il totale
+            queryParams.Add("$count=true");
+            
+            if (queryParams.Any())
+            {
+                url += "?" + string.Join("&", queryParams);
             }
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
+            
+            // Aggiungi l'header Prefer per impostare il maxpagesize
+            request.Headers.Add("Prefer", "odata.maxpagesize=50000");
+            
             if (!string.IsNullOrEmpty(sessionId))
             {
                 var cookieHeader = BuildCookieHeader(sessionId);
@@ -245,43 +402,74 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
             }
 
             var fullUrl = _httpClient.BaseAddress != null ? new Uri(_httpClient.BaseAddress, url).ToString() : url;
-            _logger.LogDebug("SAP GET relative URL: {RelativeUrl}, full URL: {FullUrl}", url, fullUrl);
+            _logger.LogDebug("SAP GET paged - relative URL: {RelativeUrl}, full URL: {FullUrl}, skip: {Skip}, top: {Top}", url, fullUrl, skip, top);
             var response = await _httpClient.SendAsync(request);
             
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                return new List<T>();
+                return (new List<T>(), 0);
             }
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
-                _logger.LogError("SAP GET failed. Relative URL: {RelativeUrl}, Full URL: {FullUrl}, Status: {Status}, Body: {Body}", url, fullUrl, response.StatusCode, errorBody);
+                _logger.LogError("SAP GET paged failed. Relative URL: {RelativeUrl}, Full URL: {FullUrl}, Status: {Status}, Body: {Body}", url, fullUrl, response.StatusCode, errorBody);
+                var ex = new HttpRequestException($"SAP GET paged {url} failed. Status: {response.StatusCode}. Body: {errorBody}");
+                ex.Data["StatusCode"] = response.StatusCode;
+                throw ex;
             }
-            response.EnsureSuccessStatusCode();
 
             var jsonDoc = await response.Content.ReadFromJsonAsync<JsonDocument>();
+            var items = new List<T>();
+            var totalCount = 0;
+
             if (jsonDoc != null)
             {
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 
+                // Recupera il totale dal campo @odata.count o odata.count
+                if (jsonDoc.RootElement.TryGetProperty("@odata.count", out var countProp))
+                {
+                    totalCount = countProp.GetInt32();
+                }
+                else if (jsonDoc.RootElement.TryGetProperty("odata.count", out countProp))
+                {
+                    totalCount = countProp.GetInt32();
+                }
+                
                 // Check if it's OData format with "value" property
                 if (jsonDoc.RootElement.TryGetProperty("value", out var valueArray))
                 {
-                    return JsonSerializer.Deserialize<List<T>>(valueArray.GetRawText(), options) ?? new List<T>();
+                    items = JsonSerializer.Deserialize<List<T>>(valueArray.GetRawText(), options) ?? new List<T>();
                 }
-                
                 // Check if it's a direct array (UDO format)
-                if (jsonDoc.RootElement.ValueKind == JsonValueKind.Array)
+                else if (jsonDoc.RootElement.ValueKind == JsonValueKind.Array)
                 {
-                    return JsonSerializer.Deserialize<List<T>>(jsonDoc.RootElement.GetRawText(), options) ?? new List<T>();
+                    items = JsonSerializer.Deserialize<List<T>>(jsonDoc.RootElement.GetRawText(), options) ?? new List<T>();
+                    // Per gli UDO, il Service Layer potrebbe non supportare $count=true
+                    // Se non abbiamo il count, recuperiamo tutti i record per contare (solo se necessario)
+                    if (totalCount == 0 && skip == 0)
+                    {
+                        // Solo alla prima pagina, recuperiamo il totale contando tutti i record
+                        // Questo è costoso ma necessario per gli UDO
+                        var allRecords = await GetRecordsAsync<T>(tableName, filter, sessionId);
+                        totalCount = allRecords.Count;
+                        _logger.LogDebug("Recuperato totale record per UDO: {TotalCount}", totalCount);
+                    }
+                    else if (totalCount == 0)
+                    {
+                        // Se non è la prima pagina e non abbiamo il count, usiamo un valore approssimativo
+                        // basato sul numero di record ricevuti
+                        totalCount = items.Count + skip;
+                        _logger.LogWarning("Count non disponibile per UDO, usando valore approssimativo: {TotalCount}", totalCount);
+                    }
                 }
             }
 
-            return new List<T>();
+            return (items, totalCount);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting records from SAP for table: {TableName}", tableName);
+            _logger.LogError(ex, "Error getting paged records from SAP for table: {TableName}", tableName);
             throw;
         }
     }
@@ -313,9 +501,10 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
                 _logger.LogError("SAP GET {Url} failed. Status: {Status}. Body: {Body}", url, response.StatusCode, errorBody);
+                var ex = new HttpRequestException($"SAP GET {url} failed. Status: {response.StatusCode}. Body: {errorBody}");
+                ex.Data["StatusCode"] = response.StatusCode;
+                throw ex;
             }
-            
-            response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<T>();
             return result!;
@@ -386,14 +575,19 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
                 }
             }
 
+            // Replace collections on PATCH instead of appending
+            request.Headers.Add("B1S-ReplaceCollectionsOnPatch", "true");
+
             _logger.LogDebug("SAP PATCH {Url}", url);
             var response = await _httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
                 _logger.LogError("SAP PATCH {Url} failed. Status: {Status}. Body: {Body}", url, response.StatusCode, errorBody);
+                var ex = new HttpRequestException($"SAP PATCH {url} failed. Status: {response.StatusCode}. Body: {errorBody}");
+                ex.Data["StatusCode"] = response.StatusCode;
+                throw ex;
             }
-            response.EnsureSuccessStatusCode();
 
             if (response.StatusCode == System.Net.HttpStatusCode.NoContent ||
                 response.Content == null ||
@@ -434,8 +628,10 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
                 _logger.LogError("SAP DELETE {Url} failed. Status: {Status}. Body: {Body}", url, response.StatusCode, errorBody);
+                var ex = new HttpRequestException($"SAP DELETE {url} failed. Status: {response.StatusCode}. Body: {errorBody}");
+                ex.Data["StatusCode"] = response.StatusCode;
+                throw ex;
             }
-            response.EnsureSuccessStatusCode();
             
             _logger.LogInformation("Successfully deleted record from table: {TableName}, code: {Code}", tableName, code);
         }

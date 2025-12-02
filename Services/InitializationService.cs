@@ -116,6 +116,7 @@ public class InitializationService : IInitializationService
 
             ("@AX_ADT_PROJLVL", new { Name = "Parent", Type = "db_Alpha", Size = 30, Description = "Numero Progetto", TableName = "@AX_ADT_PROJLVL", EditSize = 30, SubType = "st_None" }),
             ("@AX_ADT_PROJLVL", new { Name = "Ordine", Type = "db_Numeric", Description = "Ordine", TableName = "@AX_ADT_PROJLVL" }),
+            ("@AX_ADT_PROJLVL", new { Name = "Nome", Type = "db_Alpha", Size = 100, Description = "Nome Livello", TableName = "@AX_ADT_PROJLVL", EditSize = 100, SubType = "st_None" }),
             ("@AX_ADT_PROJLVL", new { Name = "Descrizione", Type = "db_Memo", Description = "Descrizione", TableName = "@AX_ADT_PROJLVL" }),
             ("@AX_ADT_PROJLVL", new { Name = "DataInizio", Type = "db_Date", Description = "Data Inizio Installazione", TableName = "@AX_ADT_PROJLVL" }),
             ("@AX_ADT_PROJLVL", new { Name = "DataFine", Type = "db_Date", Description = "Data Fine Installazione", TableName = "@AX_ADT_PROJLVL" }),
@@ -167,7 +168,16 @@ public class InitializationService : IInitializationService
             ("@AX_ADT_USERS", new { Name = "Ruolo", Type = "db_Alpha", Size = 30, Description = "Ruolo", TableName = "@AX_ADT_USERS", EditSize = 30, SubType = "st_None" }),
             ("@AX_ADT_USERS", new { Name = "TeamTecnico", Type = "db_Alpha", Size = 50, Description = "Team Tecnico", TableName = "@AX_ADT_USERS", EditSize = 50, SubType = "st_None" }),
             ("@AX_ADT_USERS", new { Name = "IsActive", Type = "db_Alpha", Size = 1, Description = "Attivo (Y/N)", TableName = "@AX_ADT_USERS", EditSize = 1, SubType = "st_None" }),
-            ("@AX_ADT_USERS", new { Name = "Password", Type = "db_Memo", Description = "Password/Hash", TableName = "@AX_ADT_USERS" })
+            ("@AX_ADT_USERS", new { Name = "Password", Type = "db_Memo", Description = "Password/Hash", TableName = "@AX_ADT_USERS" }),
+
+            ("@AX_ADT_STATI", new { Name = "CodiceISO", Type = "db_Alpha", Size = 10, Description = "Codice ISO", TableName = "@AX_ADT_STATI", EditSize = 10, SubType = "st_None" }),
+            ("@AX_ADT_STATI", new { Name = "Continente", Type = "db_Alpha", Size = 50, Description = "Continente", TableName = "@AX_ADT_STATI", EditSize = 50, SubType = "st_None" }),
+
+            ("@AX_ADT_PRODMAST", new { Name = "Categoria", Type = "db_Alpha", Size = 50, Description = "Categoria", TableName = "@AX_ADT_PRODMAST", EditSize = 50, SubType = "st_None" }),
+            ("@AX_ADT_PRODMAST", new { Name = "UnitaMisura", Type = "db_Alpha", Size = 20, Description = "Unità di Misura", TableName = "@AX_ADT_PRODMAST", EditSize = 20, SubType = "st_None" }),
+            ("@AX_ADT_PRODMAST", new { Name = "CodiceSAP", Type = "db_Alpha", Size = 50, Description = "Codice SAP", TableName = "@AX_ADT_PRODMAST", EditSize = 50, SubType = "st_None" }),
+            ("@AX_ADT_PRODMAST", new { Name = "Descrizione", Type = "db_Memo", Description = "Descrizione", TableName = "@AX_ADT_PRODMAST" }),
+            ("@AX_ADT_PRODMAST", new { Name = "Varianti", Type = "db_Memo", Description = "Varianti Disponibili", TableName = "@AX_ADT_PRODMAST" })
         };
 
         foreach (var (table, field) in fields)

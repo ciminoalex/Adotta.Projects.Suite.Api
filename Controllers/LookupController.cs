@@ -1,8 +1,10 @@
+using ADOTTA.Projects.Suite.Api.DTOs;
 using ADOTTA.Projects.Suite.Api.Models.Lookup;
 using ADOTTA.Projects.Suite.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using ADOTTA.Projects.Suite.Api.Extensions;
+using System.Net;
 
 namespace ADOTTA.Projects.Suite.Api.Controllers;
 
@@ -25,16 +27,20 @@ public class LookupController : ControllerBase
     #region Clienti
 
     [HttpGet("clienti")]
-    public async Task<ActionResult<List<Cliente>>> GetAllClienti()
+    public async Task<ActionResult<PagedResultDto<Cliente>>> GetClienti([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? search = null)
     {
         try
         {
-            var clienti = await _lookupService.GetAllClientiAsync(GetSessionId());
-            return Ok(clienti);
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 20;
+            if (pageSize > 100) pageSize = 100; // Limite massimo
+
+            var result = await _lookupService.GetClientiPagedAsync(GetSessionId(), page, pageSize, search);
+            return Ok(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting all clienti");
+            _logger.LogError(ex, "Error getting clienti");
             return StatusCode(500, new { message = "Error retrieving clienti", error = ex.Message });
         }
     }
@@ -123,16 +129,20 @@ public class LookupController : ControllerBase
     #region Stati
 
     [HttpGet("stati")]
-    public async Task<ActionResult<List<Stato>>> GetAllStati()
+    public async Task<ActionResult<PagedResultDto<Stato>>> GetStati([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         try
         {
-            var stati = await _lookupService.GetAllStatiAsync(GetSessionId());
-            return Ok(stati);
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 20;
+            if (pageSize > 100) pageSize = 100; // Limite massimo
+
+            var result = await _lookupService.GetStatiPagedAsync(GetSessionId(), page, pageSize);
+            return Ok(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting all stati");
+            _logger.LogError(ex, "Error getting stati");
             return StatusCode(500, new { message = "Error retrieving stati", error = ex.Message });
         }
     }
@@ -585,8 +595,7 @@ public class LookupController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting squadre installazione");
-            return StatusCode(500, new { message = "Error retrieving squadre installazione", error = ex.Message });
+            return this.HandleSapError<List<SquadraInstallazione>>(ex, _logger, "getting squadre installazione");
         }
     }
 
@@ -604,8 +613,7 @@ public class LookupController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting squadra installazione {Id}", id);
-            return StatusCode(500, new { message = "Error retrieving squadra installazione", error = ex.Message });
+            return this.HandleSapError<SquadraInstallazione>(ex, _logger, $"getting squadra installazione {id}");
         }
     }
 
@@ -668,8 +676,7 @@ public class LookupController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting prodotti master");
-            return StatusCode(500, new { message = "Error retrieving prodotti master", error = ex.Message });
+            return this.HandleSapError<List<ProdottoMaster>>(ex, _logger, "getting prodotti master");
         }
     }
 
@@ -687,8 +694,7 @@ public class LookupController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting prodotto master {Id}", id);
-            return StatusCode(500, new { message = "Error retrieving prodotto master", error = ex.Message });
+            return this.HandleSapError<ProdottoMaster>(ex, _logger, $"getting prodotto master {id}");
         }
     }
 

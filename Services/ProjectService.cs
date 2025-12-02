@@ -97,13 +97,72 @@ public class ProjectService : IProjectService
 
     public async Task<ProjectDto> PatchProjectAsync(string numeroProgetto, JsonElement patchDocument, string sessionId)
     {
-        var payload = BuildProjectPatchPayload(patchDocument);
-        if (payload.Count == 0)
+        // Get existing project to merge with patch data
+        var existingProject = await GetProjectByCodeAsync(numeroProgetto, sessionId);
+        if (existingProject == null)
         {
-            throw new ArgumentException("Nessun campo valido nel payload di patch");
+            throw new InvalidOperationException($"Project {numeroProgetto} not found");
         }
 
-        var result = await _sapClient.UpdateRecordAsync<JsonElement>(ProjectTable, numeroProgetto, payload, sessionId);
+        // Deserialize patch document to ProjectDto to merge collections properly
+        var patchDto = JsonSerializer.Deserialize<ProjectDto>(patchDocument.GetRawText(), new JsonSerializerOptions 
+        { 
+            PropertyNameCaseInsensitive = true 
+        });
+        
+        if (patchDto == null)
+        {
+            throw new ArgumentException("Invalid patch document");
+        }
+
+        // Merge patch data with existing project
+        // Update project fields from patch
+        if (patchDocument.TryGetProperty("cliente", out _)) existingProject.Cliente = patchDto.Cliente;
+        if (patchDocument.TryGetProperty("nomeProgetto", out _)) existingProject.NomeProgetto = patchDto.NomeProgetto;
+        if (patchDocument.TryGetProperty("citta", out _)) existingProject.Citta = patchDto.Citta;
+        if (patchDocument.TryGetProperty("stato", out _)) existingProject.Stato = patchDto.Stato;
+        if (patchDocument.TryGetProperty("dataCreazione", out _)) existingProject.DataCreazione = patchDto.DataCreazione;
+        if (patchDocument.TryGetProperty("dataInizioInstallazione", out _)) existingProject.DataInizioInstallazione = patchDto.DataInizioInstallazione;
+        if (patchDocument.TryGetProperty("dataFineInstallazione", out _)) existingProject.DataFineInstallazione = patchDto.DataFineInstallazione;
+        if (patchDocument.TryGetProperty("ultimaModifica", out _)) existingProject.UltimaModifica = patchDto.UltimaModifica;
+        if (patchDocument.TryGetProperty("valoreProgetto", out _)) existingProject.ValoreProgetto = patchDto.ValoreProgetto;
+        if (patchDocument.TryGetProperty("marginePrevisto", out _)) existingProject.MarginePrevisto = patchDto.MarginePrevisto;
+        if (patchDocument.TryGetProperty("costiSostenuti", out _)) existingProject.CostiSostenuti = patchDto.CostiSostenuti;
+        if (patchDocument.TryGetProperty("statoProgetto", out _)) existingProject.StatoProgetto = patchDto.StatoProgetto;
+        if (patchDocument.TryGetProperty("note", out _)) existingProject.Note = patchDto.Note;
+        if (patchDocument.TryGetProperty("teamTecnico", out _)) existingProject.TeamTecnico = patchDto.TeamTecnico;
+        if (patchDocument.TryGetProperty("teamAPL", out _)) existingProject.TeamAPL = patchDto.TeamAPL;
+        if (patchDocument.TryGetProperty("sales", out _)) existingProject.Sales = patchDto.Sales;
+        if (patchDocument.TryGetProperty("projectManager", out _)) existingProject.ProjectManager = patchDto.ProjectManager;
+        if (patchDocument.TryGetProperty("teamInstallazione", out _)) existingProject.TeamInstallazione = patchDto.TeamInstallazione;
+        if (patchDocument.TryGetProperty("versioneWIC", out _)) existingProject.VersioneWIC = patchDto.VersioneWIC;
+        if (patchDocument.TryGetProperty("quantitaTotaleMq", out _)) existingProject.QuantitaTotaleMq = patchDto.QuantitaTotaleMq;
+        if (patchDocument.TryGetProperty("quantitaTotaleFt", out _)) existingProject.QuantitaTotaleFt = patchDto.QuantitaTotaleFt;
+
+        // Replace collections if present in patch (WebApp always sends complete collections)
+        if (patchDocument.TryGetProperty("livelli", out var livelliElement) && livelliElement.ValueKind == JsonValueKind.Array)
+        {
+            existingProject.Livelli = patchDto.Livelli;
+            _logger.LogDebug("Replacing {Count} livelli in PATCH for project {NumeroProgetto}", 
+                existingProject.Livelli?.Count ?? 0, numeroProgetto);
+        }
+        
+        if (patchDocument.TryGetProperty("prodotti", out var prodottiElement) && prodottiElement.ValueKind == JsonValueKind.Array)
+        {
+            existingProject.Prodotti = patchDto.Prodotti;
+            _logger.LogDebug("Replacing {Count} prodotti in PATCH for project {NumeroProgetto}", 
+                existingProject.Prodotti?.Count ?? 0, numeroProgetto);
+        }
+
+        // Use MapProjectToSapUDO to ensure collections are formatted correctly (same as PUT)
+        // This approach worked before - collections were saved correctly
+        var sapUDO = ProjectMapper.MapProjectToSapUDO(existingProject);
+        
+        _logger.LogDebug("PATCH payload for project {NumeroProgetto} contains {Count} fields: {Fields}", 
+            numeroProgetto, ((Dictionary<string, object?>)sapUDO).Count, 
+            string.Join(", ", ((Dictionary<string, object?>)sapUDO).Keys));
+        
+        var result = await _sapClient.UpdateRecordAsync<JsonElement>(ProjectTable, numeroProgetto, sapUDO, sessionId);
         
         // SAP returns 204 No Content on PATCH, so re-fetch the updated project
         if (result.ValueKind == JsonValueKind.Undefined || result.ValueKind == JsonValueKind.Null)
@@ -389,6 +448,13 @@ public class ProjectService : IProjectService
         var payload = new Dictionary<string, object?>();
         foreach (var property in patchDocument.EnumerateObject())
         {
+            // Skip livelli and prodotti as they are handled separately
+            if (property.Name.Equals("livelli", StringComparison.OrdinalIgnoreCase) || 
+                property.Name.Equals("prodotti", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            
             if (!ProjectPatchMap.TryGetValue(property.Name, out var sapField))
             {
                 continue;
@@ -398,6 +464,133 @@ public class ProjectService : IProjectService
         }
 
         return payload;
+    }
+
+    private object BuildLivelliCollection(JsonElement livelliArray, string numeroProgetto)
+    {
+        var livelliList = new List<(int id, string nome, string descrizione, int ordine, string dataInizio, string dataFine, string dataCaricamento)>();
+        var idx = 0;
+        
+        foreach (var livello in livelliArray.EnumerateArray())
+        {
+            var id = 0;
+            if (livello.TryGetProperty("id", out var idElement) && idElement.ValueKind == JsonValueKind.Number)
+            {
+                id = idElement.GetInt32();
+            }
+            
+            // If no ID provided, use index-based ID (for new items)
+            if (id == 0)
+            {
+                id = idx + 1;
+            }
+            
+            var nome = livello.TryGetProperty("nome", out var uNome) ? uNome.GetString() ?? "" : "";
+            var descrizione = livello.TryGetProperty("descrizione", out var desc) ? desc.GetString() ?? "" : "";
+            var ordine = livello.TryGetProperty("ordine", out var ord) && ord.ValueKind == JsonValueKind.Number 
+                ? ord.GetInt32() 
+                : idx + 1;
+            
+            var dataInizio = "";
+            if (livello.TryGetProperty("dataInizioInstallazione", out var dataInizioProp) && dataInizioProp.ValueKind == JsonValueKind.String)
+            {
+                if (DateTime.TryParse(dataInizioProp.GetString(), out var dtInizio))
+                {
+                    dataInizio = dtInizio.ToString("yyyy-MM-ddTHH:mm:ss");
+                }
+            }
+            
+            var dataFine = "";
+            if (livello.TryGetProperty("dataFineInstallazione", out var dataFineProp) && dataFineProp.ValueKind == JsonValueKind.String)
+            {
+                if (DateTime.TryParse(dataFineProp.GetString(), out var dtFine))
+                {
+                    dataFine = dtFine.ToString("yyyy-MM-ddTHH:mm:ss");
+                }
+            }
+            
+            var dataCaricamento = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
+            if (livello.TryGetProperty("dataCaricamento", out var dataCaricamentoProp) && dataCaricamentoProp.ValueKind == JsonValueKind.String)
+            {
+                if (DateTime.TryParse(dataCaricamentoProp.GetString(), out var dtCaricamento))
+                {
+                    dataCaricamento = dtCaricamento.ToString("yyyy-MM-ddTHH:mm:ss");
+                }
+            }
+            
+            livelliList.Add((id, nome, descrizione, ordine, dataInizio, dataFine, dataCaricamento));
+            idx++;
+        }
+        
+        // Use the same approach as MapProjectToSapUDO: Select().ToList() on anonymous objects
+        return livelliList.Select((l, i) => new
+        {
+            Code = $"{numeroProgetto}-L{l.id}",
+            U_Parent = numeroProgetto,
+            U_Ordine = l.ordine,
+            U_Nome = l.nome,
+            U_Descrizione = l.descrizione,
+            U_DataInizio = l.dataInizio,
+            U_DataFine = l.dataFine,
+            U_DataCaricamento = l.dataCaricamento
+        }).ToList();
+    }
+
+    private object BuildProdottiCollection(JsonElement prodottiArray, string numeroProgetto)
+    {
+        var prodottiList = new List<(int id, string tipoProdotto, string variante, decimal qmq, decimal qft, string livelloId)>();
+        var idx = 0;
+        
+        foreach (var prodotto in prodottiArray.EnumerateArray())
+        {
+            var id = 0;
+            if (prodotto.TryGetProperty("id", out var idElement) && idElement.ValueKind == JsonValueKind.Number)
+            {
+                id = idElement.GetInt32();
+            }
+            
+            // If no ID provided, use index-based ID (for new items)
+            if (id == 0)
+            {
+                id = idx + 1;
+            }
+            
+            var tipoProdotto = prodotto.TryGetProperty("tipoProdotto", out var tipo) ? tipo.GetString() ?? "" : "";
+            var variante = prodotto.TryGetProperty("variante", out var var) ? var.GetString() ?? "" : "";
+            
+            var qmq = 0m;
+            if (prodotto.TryGetProperty("qMq", out var qmqProp) && qmqProp.ValueKind == JsonValueKind.Number)
+            {
+                qmq = qmqProp.GetDecimal();
+            }
+            
+            var qft = 0m;
+            if (prodotto.TryGetProperty("qFt", out var qftProp) && qftProp.ValueKind == JsonValueKind.Number)
+            {
+                qft = qftProp.GetDecimal();
+            }
+            
+            var livelloId = "";
+            if (prodotto.TryGetProperty("livelloId", out var lvlIdProp) && lvlIdProp.ValueKind == JsonValueKind.Number)
+            {
+                livelloId = lvlIdProp.GetInt32().ToString();
+            }
+            
+            prodottiList.Add((id, tipoProdotto, variante, qmq, qft, livelloId));
+            idx++;
+        }
+        
+        // Use the same approach as MapProjectToSapUDO: Select().ToList() on anonymous objects
+        return prodottiList.Select(p => new
+        {
+            Code = $"{numeroProgetto}-P{p.id}",
+            U_Parent = numeroProgetto,
+            U_TipoProdotto = p.tipoProdotto,
+            U_Variante = p.variante,
+            U_QMq = p.qmq,
+            U_QFt = p.qft,
+            U_LivelloId = p.livelloId
+        }).ToList();
     }
 
     private object? ConvertPatchValue(string propertyName, JsonElement value)

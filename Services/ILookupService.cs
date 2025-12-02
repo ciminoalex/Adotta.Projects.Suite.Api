@@ -1,3 +1,4 @@
+using ADOTTA.Projects.Suite.Api.DTOs;
 using ADOTTA.Projects.Suite.Api.Models.Lookup;
 
 namespace ADOTTA.Projects.Suite.Api.Services;
@@ -5,12 +6,14 @@ namespace ADOTTA.Projects.Suite.Api.Services;
 public interface ILookupService
 {
     Task<List<Cliente>> GetAllClientiAsync(string sessionId);
+    Task<PagedResultDto<Cliente>> GetClientiPagedAsync(string sessionId, int page = 1, int pageSize = 20, string? search = null);
     Task<Cliente?> GetClienteByIdAsync(string id, string sessionId);
     Task<List<Cliente>> SearchClientiAsync(string query, string sessionId);
     Task<Cliente> CreateClienteAsync(Cliente cliente, string sessionId);
     Task<Cliente> UpdateClienteAsync(string id, Cliente cliente, string sessionId);
     Task DeleteClienteAsync(string id, string sessionId);
     Task<List<Stato>> GetAllStatiAsync(string sessionId);
+    Task<PagedResultDto<Stato>> GetStatiPagedAsync(string sessionId, int page = 1, int pageSize = 20);
     Task<Stato?> GetStatoByIdAsync(string id, string sessionId);
     Task<List<Citta>> GetAllCittaAsync(string sessionId, string? statoId = null);
     Task<Citta?> GetCittaByIdAsync(string id, string sessionId);
