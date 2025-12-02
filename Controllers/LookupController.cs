@@ -27,15 +27,20 @@ public class LookupController : ControllerBase
     #region Clienti
 
     [HttpGet("clienti")]
-    public async Task<ActionResult<PagedResultDto<Cliente>>> GetClienti([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? search = null)
+    public async Task<ActionResult<PagedResultDto<Cliente>>> GetClienti(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDirection = null)
     {
         try
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 20;
-            if (pageSize > 100) pageSize = 100; // Limite massimo
+            if (pageSize > 1000) pageSize = 1000; // Limite massimo
 
-            var result = await _lookupService.GetClientiPagedAsync(GetSessionId(), page, pageSize, search);
+            var result = await _lookupService.GetClientiPagedAsync(GetSessionId(), page, pageSize, search, sortBy, sortDirection);
             return Ok(result);
         }
         catch (Exception ex)

@@ -163,6 +163,10 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
                 PropertyNamingPolicy = null,
                 DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never
             };
+
+            // Log JSON payload for Login request
+            var loginJson = JsonSerializer.Serialize(request, serializeOptions);
+            _logger.LogDebug("SAP Login request payload: {Payload}", loginJson);
             // Preflight to get ROUTEID/sticky cookie from the load balancer
             try
             {
@@ -363,7 +367,7 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
         }
     }
 
-    public async Task<(List<T> Items, int TotalCount)> GetRecordsPagedAsync<T>(string tableName, int skip, int top, string? filter = null, string sessionId = "")
+    public async Task<(List<T> Items, int TotalCount)> GetRecordsPagedAsync<T>(string tableName, int skip, int top, string? filter = null, string sessionId = "", string? orderBy = null)
     {
         try
         {
@@ -381,6 +385,12 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
             
             // Aggiungi $count per ottenere il totale
             queryParams.Add("$count=true");
+
+            // Aggiungi $orderby se specificato
+            if (!string.IsNullOrWhiteSpace(orderBy))
+            {
+                queryParams.Add($"$orderby={Uri.EscapeDataString(orderBy)}");
+            }
             
             if (queryParams.Any())
             {
@@ -521,6 +531,13 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
         try
         {
             var url = tableName;
+
+            // Log JSON payload for CREATE request
+            var createJson = JsonSerializer.Serialize(
+                record,
+                new JsonSerializerOptions { PropertyNamingPolicy = null }
+            );
+            _logger.LogDebug("SAP POST {Url} payload: {Payload}", url, createJson);
             
             var request = new HttpRequestMessage(HttpMethod.Post, url)
             {
@@ -560,6 +577,13 @@ public class SAPServiceLayerClient : ISAPServiceLayerClient
         try
         {
             var url = $"{tableName}('{code}')";
+
+            // Log JSON payload for UPDATE/PATCH request
+            var updateJson = JsonSerializer.Serialize(
+                record,
+                new JsonSerializerOptions { PropertyNamingPolicy = null }
+            );
+            _logger.LogDebug("SAP PATCH {Url} payload: {Payload}", url, updateJson);
             
             var request = new HttpRequestMessage(HttpMethod.Patch, url)
             {

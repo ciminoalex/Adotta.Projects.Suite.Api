@@ -11,7 +11,7 @@ public class ProjectService : IProjectService
     private const string ProjectTable = "AX_ADT_PROJECT";
     private const string LivelliTable = "@AX_ADT_PROJLVL";
     private const string ProdottiTable = "@AX_ADT_PROPRD";
-    private const string MessaggiTable = "@AX_ADT_PROMSG";
+    private const string MessaggiTable = "AX_ADT_PROMSG";
     private const string ChangeLogTable = "@AX_ADT_PROCHG";
 
     private static readonly IReadOnlyDictionary<string, string> ProjectPatchMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -214,7 +214,23 @@ public class ProjectService : IProjectService
     {
         // Child tables can only be retrieved through parent project
         var project = await GetProjectByCodeAsync(numeroProgetto, sessionId);
-        return project?.Livelli ?? new List<LivelloProgettoDto>();
+        if (project == null)
+        {
+            return new List<LivelloProgettoDto>();
+        }
+
+        // Attach prodotti to each livello based on logical U_LivelloId mapping
+        var livelli = project.Livelli ?? new List<LivelloProgettoDto>();
+        var prodotti = project.Prodotti ?? new List<ProdottoProgettoDto>();
+
+        foreach (var livello in livelli)
+        {
+            livello.Prodotti = prodotti
+                .Where(p => p.LivelloId.HasValue && p.LivelloId.Value == livello.Id)
+                .ToList();
+        }
+
+        return livelli;
     }
 
     public async Task<List<ProdottoProgettoDto>> GetProdottiAsync(string numeroProgetto, string sessionId)
@@ -334,7 +350,7 @@ public class ProjectService : IProjectService
         return ProjectMapper.MapMessaggioFromSap(created, numeroProgetto);
     }
 
-    public async Task<MessaggioProgettoDto> UpdateMessaggioAsync(string numeroProgetto, int messaggioId, MessaggioProgettoDto messaggio, string sessionId)
+    public async Task<MessaggioProgettoDto> UpdateMessaggioAsync(string numeroProgetto, string messaggioId, MessaggioProgettoDto messaggio, string sessionId)
     {
         messaggio.Id = messaggioId;
         var payload = MapMessaggioToSap(numeroProgetto, messaggio);
@@ -342,7 +358,7 @@ public class ProjectService : IProjectService
         return ProjectMapper.MapMessaggioFromSap(updated, numeroProgetto);
     }
 
-    public async Task DeleteMessaggioAsync(string numeroProgetto, int messaggioId, string sessionId)
+    public async Task DeleteMessaggioAsync(string numeroProgetto, string messaggioId, string sessionId)
     {
         await _sapClient.DeleteRecordAsync(MessaggiTable, BuildMessageCode(numeroProgetto, messaggioId), sessionId);
     }
@@ -626,7 +642,7 @@ public class ProjectService : IProjectService
 
     private object MapMessaggioToSap(string numeroProgetto, MessaggioProgettoDto messaggio)
     {
-        var ensuredId = EnsureEntityId(messaggio.Id);
+        var ensuredId = messaggio.Id;
         messaggio.Id = ensuredId;
         var code = BuildMessageCode(numeroProgetto, ensuredId);
 
@@ -643,7 +659,7 @@ public class ProjectService : IProjectService
         };
     }
 
-    private static string BuildMessageCode(string numeroProgetto, int messaggioId) => $"{numeroProgetto}-MSG{messaggioId}";
+    private static string BuildMessageCode(string numeroProgetto, string messaggioId) => $"{numeroProgetto}-MSG{messaggioId}";
 
     private object MapChangeLogToSap(string numeroProgetto, ChangeLogDto change)
     {

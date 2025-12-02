@@ -26,8 +26,8 @@ public interface IProjectService
     Task<List<StoricoModificaDto>> CreateWicSnapshotAsync(string numeroProgetto, string sessionId);
     Task<List<MessaggioProgettoDto>> GetMessaggiAsync(string numeroProgetto, string sessionId);
     Task<MessaggioProgettoDto> CreateMessaggioAsync(string numeroProgetto, MessaggioProgettoDto messaggio, string sessionId);
-    Task<MessaggioProgettoDto> UpdateMessaggioAsync(string numeroProgetto, int messaggioId, MessaggioProgettoDto messaggio, string sessionId);
-    Task DeleteMessaggioAsync(string numeroProgetto, int messaggioId, string sessionId);
+    Task<MessaggioProgettoDto> UpdateMessaggioAsync(string numeroProgetto, string messaggioId, MessaggioProgettoDto messaggio, string sessionId);
+    Task DeleteMessaggioAsync(string numeroProgetto, string messaggioId, string sessionId);
     Task<List<ChangeLogDto>> GetChangeLogAsync(string numeroProgetto, string sessionId);
     Task<ChangeLogDto> CreateChangeLogAsync(string numeroProgetto, ChangeLogDto change, string sessionId);
     Task<ProjectExportResultDto> ExportProjectsAsync(string format, ProjectExportRequestDto request, string sessionId);

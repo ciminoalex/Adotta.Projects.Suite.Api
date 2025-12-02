@@ -2,7 +2,7 @@ namespace ADOTTA.Projects.Suite.Api.Models.Lookup;
 
 public class SquadraInstallazione
 {
-    public string Id { get; set; } = string.Empty;
+    public string? Id { get; set; } = string.Empty;
     public string Nome { get; set; } = string.Empty;
     public string? Tipo { get; set; }
     public string? Contatto { get; set; }

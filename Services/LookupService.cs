@@ -32,7 +32,7 @@ public class LookupService : ILookupService
         return sapData.Select(MapToCliente).ToList();
     }
 
-    public async Task<PagedResultDto<Cliente>> GetClientiPagedAsync(string sessionId, int page = 1, int pageSize = 20, string? search = null)
+    public async Task<PagedResultDto<Cliente>> GetClientiPagedAsync(string sessionId, int page = 1, int pageSize = 20, string? search = null, string? sortBy = null, string? sortDirection = null)
     {
         var skip = (page - 1) * pageSize;
         var filter = "CardType eq 'C'";
@@ -43,7 +43,8 @@ public class LookupService : ILookupService
             filter += $" and (contains(CardCode, '{safeSearch}') or contains(CardName, '{safeSearch}') or contains(EmailAddress, '{safeSearch}'))";
         }
 
-        var (sapData, totalCount) = await _sapClient.GetRecordsPagedAsync<JsonElement>(BusinessPartnersTable, skip, pageSize, filter, sessionId);
+        var orderBy = BuildClientiOrderBy(sortBy, sortDirection);
+        var (sapData, totalCount) = await _sapClient.GetRecordsPagedAsync<JsonElement>(BusinessPartnersTable, skip, pageSize, filter, sessionId, orderBy);
         var clienti = sapData.Select(MapToCliente).ToList();
 
         return new PagedResultDto<Cliente>
@@ -53,6 +54,21 @@ public class LookupService : ILookupService
             Page = page,
             PageSize = pageSize
         };
+    }
+
+    private static string BuildClientiOrderBy(string? sortBy, string? sortDirection)
+    {
+        var direction = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc";
+
+        var field = sortBy?.ToLowerInvariant() switch
+        {
+            "id" or "code" or "cardcode" => "CardCode",
+            "email" or "emailaddress" => "EmailAddress",
+            "nome" or "name" or "cardname" => "CardName",
+            _ => "CardName"
+        };
+
+        return $"{field} {direction}";
     }
 
     public async Task<Cliente?> GetClienteByIdAsync(string id, string sessionId)
@@ -81,8 +97,9 @@ public class LookupService : ILookupService
     {
         cliente.CardCode = id;
         var payload = MapClienteToSap(cliente, isUpdate: true);
-        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(BusinessPartnersTable, id, payload, sessionId);
-        return MapToCliente(updated);
+        await _sapClient.UpdateRecordAsync<JsonElement>(BusinessPartnersTable, id, payload, sessionId);
+        var updatedSap = await _sapClient.GetRecordAsync<JsonElement>(BusinessPartnersTable, id, sessionId);
+        return MapToCliente(updatedSap);
     }
 
     public async Task DeleteClienteAsync(string id, string sessionId)
@@ -147,8 +164,9 @@ public class LookupService : ILookupService
     {
         citta.Id = id;
         var payload = MapCittaToSap(citta, isUpdate: true);
-        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(CittaTable, id, payload, sessionId);
-        return MapToCitta(updated);
+        await _sapClient.UpdateRecordAsync<JsonElement>(CittaTable, id, payload, sessionId);
+        var updatedSap = await _sapClient.GetRecordAsync<JsonElement>(CittaTable, id, sessionId);
+        return MapToCitta(updatedSap);
     }
 
     public async Task DeleteCittaAsync(string id, string sessionId)
@@ -180,8 +198,9 @@ public class LookupService : ILookupService
     {
         team.Id = id;
         var payload = MapTeamTecnicoToSap(team);
-        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(TeamTecniciTable, id, payload, sessionId);
-        return MapToTeamTecnico(updated);
+        await _sapClient.UpdateRecordAsync<JsonElement>(TeamTecniciTable, id, payload, sessionId);
+        var updatedSap = await _sapClient.GetRecordAsync<JsonElement>(TeamTecniciTable, id, sessionId);
+        return MapToTeamTecnico(updatedSap);
     }
 
     public async Task DeleteTeamTecnicoAsync(string id, string sessionId)
@@ -213,8 +232,9 @@ public class LookupService : ILookupService
     {
         team.Id = id;
         var payload = MapTeamAPLToSap(team);
-        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(TeamAPLTable, id, payload, sessionId);
-        return MapToTeamAPL(updated);
+        await _sapClient.UpdateRecordAsync<JsonElement>(TeamAPLTable, id, payload, sessionId);
+        var updatedSap = await _sapClient.GetRecordAsync<JsonElement>(TeamAPLTable, id, sessionId);
+        return MapToTeamAPL(updatedSap);
     }
 
     public async Task DeleteTeamAPLAsync(string id, string sessionId)
@@ -246,8 +266,9 @@ public class LookupService : ILookupService
     {
         sales.Id = id;
         var payload = MapSalesToSap(sales);
-        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(SalesTable, id, payload, sessionId);
-        return MapToSales(updated);
+        await _sapClient.UpdateRecordAsync<JsonElement>(SalesTable, id, payload, sessionId);
+        var updatedSap = await _sapClient.GetRecordAsync<JsonElement>(SalesTable, id, sessionId);
+        return MapToSales(updatedSap);
     }
 
     public async Task DeleteSalesAsync(string id, string sessionId)
@@ -279,8 +300,9 @@ public class LookupService : ILookupService
     {
         manager.Id = id;
         var payload = MapProjectManagerToSap(manager);
-        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(ProjectManagerTable, id, payload, sessionId);
-        return MapToProjectManager(updated);
+        await _sapClient.UpdateRecordAsync<JsonElement>(ProjectManagerTable, id, payload, sessionId);
+        var updatedSap = await _sapClient.GetRecordAsync<JsonElement>(ProjectManagerTable, id, sessionId);
+        return MapToProjectManager(updatedSap);
     }
 
     public async Task DeleteProjectManagerAsync(string id, string sessionId)
@@ -312,8 +334,9 @@ public class LookupService : ILookupService
     {
         squadra.Id = id;
         var payload = MapSquadraInstallazioneToSap(squadra);
-        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(SquadraInstallazioneTable, id, payload, sessionId);
-        return MapToSquadraInstallazione(updated);
+        await _sapClient.UpdateRecordAsync<JsonElement>(SquadraInstallazioneTable, id, payload, sessionId);
+        var updatedSap = await _sapClient.GetRecordAsync<JsonElement>(SquadraInstallazioneTable, id, sessionId);
+        return MapToSquadraInstallazione(updatedSap);
     }
 
     public async Task DeleteSquadraInstallazioneAsync(string id, string sessionId)
@@ -350,8 +373,9 @@ public class LookupService : ILookupService
     {
         prodotto.Id = id;
         var payload = MapProdottoMasterToSap(prodotto);
-        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(ProdottiMasterTable, id, payload, sessionId);
-        return MapToProdottoMaster(updated);
+        await _sapClient.UpdateRecordAsync<JsonElement>(ProdottiMasterTable, id, payload, sessionId);
+        var updatedSap = await _sapClient.GetRecordAsync<JsonElement>(ProdottiMasterTable, id, sessionId);
+        return MapToProdottoMaster(updatedSap);
     }
 
     public async Task DeleteProdottoMasterAsync(string id, string sessionId)

@@ -45,7 +45,7 @@ public class InitializationService : IInitializationService
             new { Name = "AX_ADT_PROJLVL", Description = "Adt Prjs: Livelli", Type = "bott_MasterDataLines" },
             new { Name = "AX_ADT_PROPRD", Description = "Adt Prjs: Prodotti", Type = "bott_MasterDataLines" },
             new { Name = "AX_ADT_PROHIST", Description = "Adt Prjs: Storico", Type = "bott_MasterDataLines" },
-            new { Name = "AX_ADT_PROMSG", Description = "Adt Prjs: Messaggi", Type = "bott_MasterDataLines" },
+            new { Name = "AX_ADT_PROMSG", Description = "Adt Prjs: Messaggi", Type = "bott_MasterData" },
             new { Name = "AX_ADT_PROCHG", Description = "Adt Prjs: ChangeLog", Type = "bott_MasterDataLines" },
             new { Name = "AX_ADT_STATI", Description = "Adt Prjs: Stati", Type = "bott_MasterData" },
             new { Name = "AX_ADT_CITTA", Description = "Adt Prjs: Città", Type = "bott_MasterData" },
@@ -121,6 +121,8 @@ public class InitializationService : IInitializationService
             ("@AX_ADT_PROJLVL", new { Name = "DataInizio", Type = "db_Date", Description = "Data Inizio Installazione", TableName = "@AX_ADT_PROJLVL" }),
             ("@AX_ADT_PROJLVL", new { Name = "DataFine", Type = "db_Date", Description = "Data Fine Installazione", TableName = "@AX_ADT_PROJLVL" }),
             ("@AX_ADT_PROJLVL", new { Name = "DataCaricamento", Type = "db_Date", Description = "Data Caricamento", TableName = "@AX_ADT_PROJLVL" }),
+            // Logical level id used to link products to levels (stable across saves)
+            ("@AX_ADT_PROJLVL", new { Name = "LivelloId", Type = "db_Alpha", Size = 20, Description = "ID Livello logico", TableName = "@AX_ADT_PROJLVL", EditSize = 20, SubType = "st_None" }),
 
             ("@AX_ADT_PROPRD", new { Name = "Parent", Type = "db_Alpha", Size = 30, Description = "Numero Progetto", TableName = "@AX_ADT_PROPRD", EditSize = 30, SubType = "st_None" }),
             ("@AX_ADT_PROPRD", new { Name = "TipoProdotto", Type = "db_Alpha", Size = 50, Description = "Tipo Prodotto", TableName = "@AX_ADT_PROPRD", EditSize = 50, SubType = "st_None" }),
@@ -177,7 +179,47 @@ public class InitializationService : IInitializationService
             ("@AX_ADT_PRODMAST", new { Name = "UnitaMisura", Type = "db_Alpha", Size = 20, Description = "Unità di Misura", TableName = "@AX_ADT_PRODMAST", EditSize = 20, SubType = "st_None" }),
             ("@AX_ADT_PRODMAST", new { Name = "CodiceSAP", Type = "db_Alpha", Size = 50, Description = "Codice SAP", TableName = "@AX_ADT_PRODMAST", EditSize = 50, SubType = "st_None" }),
             ("@AX_ADT_PRODMAST", new { Name = "Descrizione", Type = "db_Memo", Description = "Descrizione", TableName = "@AX_ADT_PRODMAST" }),
-            ("@AX_ADT_PRODMAST", new { Name = "Varianti", Type = "db_Memo", Description = "Varianti Disponibili", TableName = "@AX_ADT_PRODMAST" })
+            ("@AX_ADT_PRODMAST", new { Name = "Varianti", Type = "db_Memo", Description = "Varianti Disponibili", TableName = "@AX_ADT_PRODMAST" }),
+
+            // AX_ADT_TEAMTECH (Team Tecnici)
+            ("@AX_ADT_TEAMTECH", new { Name = "Email", Type = "db_Alpha", Size = 100, Description = "Email team tecnico", TableName = "@AX_ADT_TEAMTECH", EditSize = 100, SubType = "st_None" }),
+            ("@AX_ADT_TEAMTECH", new { Name = "Telefono", Type = "db_Alpha", Size = 50, Description = "Telefono team tecnico", TableName = "@AX_ADT_TEAMTECH", EditSize = 50, SubType = "st_None" }),
+            ("@AX_ADT_TEAMTECH", new { Name = "Specializzazione", Type = "db_Alpha", Size = 100, Description = "Specializzazione team tecnico", TableName = "@AX_ADT_TEAMTECH", EditSize = 100, SubType = "st_None" }),
+            ("@AX_ADT_TEAMTECH", new { Name = "Disponibilita", Type = "db_Alpha", Size = 1, Description = "Disponibile (Y/N)", TableName = "@AX_ADT_TEAMTECH", EditSize = 1, SubType = "st_None" }),
+            ("@AX_ADT_TEAMTECH", new { Name = "Membri", Type = "db_Memo", Description = "Membri del team", TableName = "@AX_ADT_TEAMTECH" }),
+
+            // AX_ADT_CITTA (Città)
+            ("@AX_ADT_CITTA", new { Name = "StatoId", Type = "db_Alpha", Size = 50, Description = "ID Stato", TableName = "@AX_ADT_CITTA", EditSize = 50, SubType = "st_None" }),
+            ("@AX_ADT_CITTA", new { Name = "Cap", Type = "db_Alpha", Size = 20, Description = "CAP", TableName = "@AX_ADT_CITTA", EditSize = 20, SubType = "st_None" }),
+            ("@AX_ADT_CITTA", new { Name = "Provincia", Type = "db_Alpha", Size = 50, Description = "Provincia", TableName = "@AX_ADT_CITTA", EditSize = 50, SubType = "st_None" }),
+            ("@AX_ADT_CITTA", new { Name = "Regione", Type = "db_Alpha", Size = 50, Description = "Regione", TableName = "@AX_ADT_CITTA", EditSize = 50, SubType = "st_None" }),
+
+            // AX_ADT_TEAMAPL (Team APL)
+            ("@AX_ADT_TEAMAPL", new { Name = "Email", Type = "db_Alpha", Size = 100, Description = "Email team APL", TableName = "@AX_ADT_TEAMAPL", EditSize = 100, SubType = "st_None" }),
+            ("@AX_ADT_TEAMAPL", new { Name = "Telefono", Type = "db_Alpha", Size = 50, Description = "Telefono team APL", TableName = "@AX_ADT_TEAMAPL", EditSize = 50, SubType = "st_None" }),
+            ("@AX_ADT_TEAMAPL", new { Name = "Area", Type = "db_Alpha", Size = 100, Description = "Area geografica", TableName = "@AX_ADT_TEAMAPL", EditSize = 100, SubType = "st_None" }),
+            ("@AX_ADT_TEAMAPL", new { Name = "Competenze", Type = "db_Memo", Description = "Competenze (lista)", TableName = "@AX_ADT_TEAMAPL" }),
+
+            // AX_ADT_SALES (Sales)
+            ("@AX_ADT_SALES", new { Name = "Email", Type = "db_Alpha", Size = 100, Description = "Email sales", TableName = "@AX_ADT_SALES", EditSize = 100, SubType = "st_None" }),
+            ("@AX_ADT_SALES", new { Name = "Telefono", Type = "db_Alpha", Size = 50, Description = "Telefono sales", TableName = "@AX_ADT_SALES", EditSize = 50, SubType = "st_None" }),
+            ("@AX_ADT_SALES", new { Name = "Zona", Type = "db_Alpha", Size = 100, Description = "Zona", TableName = "@AX_ADT_SALES", EditSize = 100, SubType = "st_None" }),
+            ("@AX_ADT_SALES", new { Name = "RegioneCompetenza", Type = "db_Alpha", Size = 100, Description = "Regione di competenza", TableName = "@AX_ADT_SALES", EditSize = 100, SubType = "st_None" }),
+            ("@AX_ADT_SALES", new { Name = "ProgettiGestiti", Type = "db_Numeric", Description = "Numero progetti gestiti", TableName = "@AX_ADT_SALES" }),
+
+            // AX_ADT_PMGR (Project Managers)
+            ("@AX_ADT_PMGR", new { Name = "Email", Type = "db_Alpha", Size = 100, Description = "Email PM", TableName = "@AX_ADT_PMGR", EditSize = 100, SubType = "st_None" }),
+            ("@AX_ADT_PMGR", new { Name = "Telefono", Type = "db_Alpha", Size = 50, Description = "Telefono PM", TableName = "@AX_ADT_PMGR", EditSize = 50, SubType = "st_None" }),
+            ("@AX_ADT_PMGR", new { Name = "Esperienza", Type = "db_Alpha", Size = 100, Description = "Esperienza PM", TableName = "@AX_ADT_PMGR", EditSize = 100, SubType = "st_None" }),
+            ("@AX_ADT_PMGR", new { Name = "ProgettiAttivi", Type = "db_Numeric", Description = "Numero progetti attivi", TableName = "@AX_ADT_PMGR" }),
+            ("@AX_ADT_PMGR", new { Name = "Certificazioni", Type = "db_Memo", Description = "Certificazioni (lista)", TableName = "@AX_ADT_PMGR" }),
+
+            // AX_ADT_SQUADRA (Squadre installazione)
+            ("@AX_ADT_SQUADRA", new { Name = "Tipo", Type = "db_Alpha", Size = 50, Description = "Tipo squadra", TableName = "@AX_ADT_SQUADRA", EditSize = 50, SubType = "st_None" }),
+            ("@AX_ADT_SQUADRA", new { Name = "Contatto", Type = "db_Alpha", Size = 100, Description = "Contatto referente", TableName = "@AX_ADT_SQUADRA", EditSize = 100, SubType = "st_None" }),
+            ("@AX_ADT_SQUADRA", new { Name = "Disponibilita", Type = "db_Alpha", Size = 1, Description = "Disponibile (Y/N)", TableName = "@AX_ADT_SQUADRA", EditSize = 1, SubType = "st_None" }),
+            ("@AX_ADT_SQUADRA", new { Name = "NumeroMembri", Type = "db_Numeric", Description = "Numero membri", TableName = "@AX_ADT_SQUADRA" }),
+            ("@AX_ADT_SQUADRA", new { Name = "Competenze", Type = "db_Memo", Description = "Competenze (lista)", TableName = "@AX_ADT_SQUADRA" })
         };
 
         foreach (var (table, field) in fields)
@@ -223,7 +265,6 @@ public class InitializationService : IInitializationService
                 new { ObjectName = "AX_ADT_PROJLVL", TableName = "AX_ADT_PROJLVL" },
                 new { ObjectName = "AX_ADT_PROPRD", TableName = "AX_ADT_PROPRD" },
                 new { ObjectName = "AX_ADT_PROHIST", TableName = "AX_ADT_PROHIST" },
-                new { ObjectName = "AX_ADT_PROMSG", TableName = "AX_ADT_PROMSG" },
                 new { ObjectName = "AX_ADT_PROCHG", TableName = "AX_ADT_PROCHG" }
             }
         };
@@ -242,7 +283,8 @@ public class InitializationService : IInitializationService
             new { Code = "AX_ADT_SQUADRA", Name = "Adt Prjs: Squadre Install", ObjectType = (string?)null },
             new { Code = "AX_ADT_PRODMAST", Name = "Adt Prjs: Prod. Master", ObjectType = (string?)null },
             new { Code = "AX_ADT_TIMESHEET", Name = "Adt Prjs: Timesheet", ObjectType = (string?)null },
-            new { Code = "AX_ADT_USERS", Name = "Adt Prjs: Users", ObjectType = (string?)null }
+            new { Code = "AX_ADT_USERS", Name = "Adt Prjs: Users", ObjectType = (string?)null },
+            new { Code = "AX_ADT_PROMSG", Name = "Adt Prjs: Messaggi", ObjectType = (string?)null }
         };
 
         foreach (var u in otherUdos)

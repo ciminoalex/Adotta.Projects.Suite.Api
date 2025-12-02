@@ -387,7 +387,7 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpPut("{numeroProgetto}/messaggi/{messaggioId}")]
-    public async Task<ActionResult<MessaggioProgettoDto>> UpdateMessaggio(string numeroProgetto, int messaggioId, [FromBody] MessaggioProgettoDto messaggio)
+    public async Task<ActionResult<MessaggioProgettoDto>> UpdateMessaggio(string numeroProgetto, string messaggioId, [FromBody] MessaggioProgettoDto messaggio)
     {
         try
         {
@@ -402,7 +402,7 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpDelete("{numeroProgetto}/messaggi/{messaggioId}")]
-    public async Task<IActionResult> DeleteMessaggio(string numeroProgetto, int messaggioId)
+    public async Task<IActionResult> DeleteMessaggio(string numeroProgetto, string messaggioId)
     {
         try
         {

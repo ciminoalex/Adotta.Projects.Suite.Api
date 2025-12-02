@@ -6,7 +6,7 @@ namespace ADOTTA.Projects.Suite.Api.Services;
 public interface ILookupService
 {
     Task<List<Cliente>> GetAllClientiAsync(string sessionId);
-    Task<PagedResultDto<Cliente>> GetClientiPagedAsync(string sessionId, int page = 1, int pageSize = 20, string? search = null);
+    Task<PagedResultDto<Cliente>> GetClientiPagedAsync(string sessionId, int page = 1, int pageSize = 20, string? search = null, string? sortBy = null, string? sortDirection = null);
     Task<Cliente?> GetClienteByIdAsync(string id, string sessionId);
     Task<List<Cliente>> SearchClientiAsync(string query, string sessionId);
     Task<Cliente> CreateClienteAsync(Cliente cliente, string sessionId);

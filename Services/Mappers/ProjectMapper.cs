@@ -38,16 +38,19 @@ public static class ProjectMapper
         };
 
         // Include child collections for SAP UDO
-        // Note: SAP UDO child tables only support Code and U_ prefixed fields in collections
+        // NOTE: For child collections, SAP expects Code to match the parent Code (numero progetto)
+        // and uses internal LineId for the row identifier. IDs are mapped from LineId on read.
         if (dto.Livelli != null && dto.Livelli.Count > 0)
         {
             result["AX_ADT_PROJLVLCollection"] = dto.Livelli.Select((l, idx) => new
             {
-                Code = l.Id > 0 ? $"{dto.NumeroProgetto}-L{l.Id}" : $"{dto.NumeroProgetto}-L{idx + 1}",
+                Code = dto.NumeroProgetto,
                 U_Parent = dto.NumeroProgetto,
                 U_Ordine = l.Ordine > 0 ? l.Ordine : idx + 1,
                 U_Nome = l.Nome ?? "",
                 U_Descrizione = l.Descrizione ?? "",
+                // U_LivelloId is the stable logical ID used to link products to levels
+                U_LivelloId = l.Id.ToString(),
                 U_DataInizio = l.DataInizioInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
                 U_DataFine = l.DataFineInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
                 U_DataCaricamento = l.DataCaricamento?.ToString("yyyy-MM-ddTHH:mm:ss") ?? ""
@@ -58,7 +61,7 @@ public static class ProjectMapper
         {
             result["AX_ADT_PROPRDCollection"] = dto.Prodotti.Select((p, idx) => new
             {
-                Code = p.Id > 0 ? $"{dto.NumeroProgetto}-P{p.Id}" : $"{dto.NumeroProgetto}-P{idx + 1}",
+                Code = dto.NumeroProgetto,
                 U_Parent = dto.NumeroProgetto,
                 U_TipoProdotto = p.TipoProdotto,
                 U_Variante = p.Variante,
@@ -151,18 +154,17 @@ public static class ProjectMapper
 
     public static LivelloProgettoDto MapLivelloFromSap(JsonElement sapData, string numeroProgetto)
     {
+        // Prefer the logical U_LivelloId if present, fallback to LineId
         var id = 0;
-        if (sapData.TryGetProperty("Code", out var code))
+        if (sapData.TryGetProperty("U_LivelloId", out var uLivelloIdProp) &&
+            uLivelloIdProp.ValueKind == JsonValueKind.String &&
+            int.TryParse(uLivelloIdProp.GetString(), out var parsedLogicalId))
         {
-            var codeStr = code.GetString();
-            if (!string.IsNullOrEmpty(codeStr))
-            {
-                var parts = codeStr.Split('-');
-                if (parts.Length > 1 && parts[1].Length > 1 && int.TryParse(parts[1].Substring(1), out var parsedId))
-                {
-                    id = parsedId;
-                }
-            }
+            id = parsedLogicalId;
+        }
+        else if (sapData.TryGetProperty("LineId", out var lineIdProp) && lineIdProp.ValueKind == JsonValueKind.Number)
+        {
+            id = lineIdProp.GetInt32();
         }
 
         // Try to get nome from U_Nome field first, then from Name, then extract from descrizione for backward compatibility
@@ -211,19 +213,10 @@ public static class ProjectMapper
 
     public static ProdottoProgettoDto MapProdottoFromSap(JsonElement sapData, string numeroProgetto)
     {
-        var id = 0;
-        if (sapData.TryGetProperty("Code", out var code))
-        {
-            var codeStr = code.GetString();
-            if (!string.IsNullOrEmpty(codeStr))
-            {
-                var parts = codeStr.Split('-');
-                if (parts.Length > 1 && parts[1].Length > 1 && int.TryParse(parts[1].Substring(1), out var parsedId))
-                {
-                    id = parsedId;
-                }
-            }
-        }
+        // For child collections, SAP uses LineId as row identifier
+        var id = sapData.TryGetProperty("LineId", out var lineIdProp) && lineIdProp.ValueKind == JsonValueKind.Number
+            ? lineIdProp.GetInt32()
+            : 0;
 
         return new ProdottoProgettoDto
         {
@@ -247,6 +240,7 @@ public static class ProjectMapper
             U_Ordine = dto.Ordine,
             U_Nome = dto.Nome ?? "",
             U_Descrizione = dto.Descrizione ?? "",
+            U_LivelloId = dto.Id.ToString(),
             U_DataInizio = dto.DataInizioInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
             U_DataFine = dto.DataFineInstallazione?.ToString("yyyy-MM-ddTHH:mm:ss") ?? "",
             U_DataCaricamento = dto.DataCaricamento?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss")
@@ -286,11 +280,62 @@ public static class ProjectMapper
 
     public static MessaggioProgettoDto MapMessaggioFromSap(JsonElement sapData, string numeroProgetto)
     {
+        // Prefer SAP system fields CreateDate + CreateTime for the message timestamp.
+        // Fallback to U_Data (legacy/custom field) and finally to UtcNow if nothing is available.
+        DateTime dataMessaggio = DateTime.UtcNow;
+
+        try
+        {
+            if (sapData.TryGetProperty("CreateDate", out var createDateProp) &&
+                sapData.TryGetProperty("CreateTime", out var createTimeProp))
+            {
+                // Typical SAP format: dates as "yyyyMMdd" or "20241129", times as "HHmmss" or numeric seconds.
+                var createDateStr = createDateProp.GetString();
+                var createTimeStr = createTimeProp.GetString();
+
+                if (!string.IsNullOrWhiteSpace(createDateStr) && !string.IsNullOrWhiteSpace(createTimeStr))
+                {
+                    // Normalize to fixed-length strings if they come as numbers
+                    if (int.TryParse(createDateStr, out var createDateInt))
+                    {
+                        createDateStr = createDateInt.ToString("00000000");
+                    }
+                    if (int.TryParse(createTimeStr, out var createTimeInt))
+                    {
+                        createTimeStr = createTimeInt.ToString("000000");
+                    }
+
+                    if (createDateStr.Length == 8 && createTimeStr.Length == 6)
+                    {
+                        var year = int.Parse(createDateStr[..4]);
+                        var month = int.Parse(createDateStr.Substring(4, 2));
+                        var day = int.Parse(createDateStr.Substring(6, 2));
+
+                        var hour = int.Parse(createTimeStr[..2]);
+                        var minute = int.Parse(createTimeStr.Substring(2, 2));
+                        var second = int.Parse(createTimeStr.Substring(4, 2));
+
+                        dataMessaggio = new DateTime(year, month, day, hour, minute, second, DateTimeKind.Utc);
+                    }
+                }
+            }
+            else if (sapData.TryGetProperty("U_Data", out var legacyDateProp) &&
+                     DateTime.TryParse(legacyDateProp.GetString(), out var legacyDt))
+            {
+                dataMessaggio = legacyDt;
+            }
+        }
+        catch
+        {
+            // In caso di problemi di parsing, manteniamo il fallback a UtcNow
+            dataMessaggio = DateTime.UtcNow;
+        }
+
         return new MessaggioProgettoDto
         {
-            Id = sapData.TryGetProperty("Code", out var code) ? ExtractNumericId(code.GetString()) : 0,
+            Id = sapData.TryGetProperty("Code", out var code) ? code.GetString() : "",
             NumeroProgetto = numeroProgetto,
-            Data = sapData.TryGetProperty("U_Data", out var date) && DateTime.TryParse(date.GetString(), out var dt) ? dt : DateTime.UtcNow,
+            Data = dataMessaggio,
             Utente = sapData.TryGetProperty("U_Utente", out var user) ? user.GetString() ?? string.Empty : string.Empty,
             Messaggio = sapData.TryGetProperty("U_Messaggio", out var msg) ? msg.GetString() ?? string.Empty : string.Empty,
             Tipo = sapData.TryGetProperty("U_Tipo", out var tipo) ? tipo.GetString() ?? "info" : "info",
