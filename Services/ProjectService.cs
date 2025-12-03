@@ -80,22 +80,38 @@ public class ProjectService : IProjectService
         return ProjectMapper.MapSapUDOToProject(result);
     }
 
-    public async Task<ProjectDto> UpdateProjectAsync(string numeroProgetto, ProjectDto project, string sessionId)
+    public async Task<ProjectDto> UpdateProjectAsync(string numeroProgetto, ProjectDto project, string sessionId, string? utente = null)
     {
-        var sapUDO = ProjectMapper.MapProjectToSapUDO(project);
+        // Recupera la versione corrente prima dell'update
+        var existingProject = await GetProjectByCodeAsync(numeroProgetto, sessionId);
+        if (existingProject == null)
+        {
+            throw new InvalidOperationException($"Project {numeroProgetto} not found");
+        }
+
+        // Confronta le versioni e genera le modifiche PRIMA dell'update
+        var changeLogEntries = GenerateChangeLogEntries(numeroProgetto, existingProject, project, utente);
+
+        // Include le modifiche nel payload SAP come collection
+        var sapUDO = ProjectMapper.MapProjectToSapUDO(project, changeLogEntries);
         var result = await _sapClient.UpdateRecordAsync<JsonElement>(ProjectTable, numeroProgetto, sapUDO, sessionId);
         
         // SAP returns 204 No Content on PATCH, so re-fetch the updated project
+        ProjectDto updated;
         if (result.ValueKind == JsonValueKind.Undefined || result.ValueKind == JsonValueKind.Null)
         {
-            var updated = await GetProjectByCodeAsync(numeroProgetto, sessionId);
-            return updated ?? throw new InvalidOperationException($"Project {numeroProgetto} not found after update");
+            updated = await GetProjectByCodeAsync(numeroProgetto, sessionId) 
+                ?? throw new InvalidOperationException($"Project {numeroProgetto} not found after update");
         }
-        
-        return ProjectMapper.MapSapUDOToProject(result);
+        else
+        {
+            updated = ProjectMapper.MapSapUDOToProject(result);
+        }
+
+        return updated;
     }
 
-    public async Task<ProjectDto> PatchProjectAsync(string numeroProgetto, JsonElement patchDocument, string sessionId)
+    public async Task<ProjectDto> PatchProjectAsync(string numeroProgetto, JsonElement patchDocument, string sessionId, string? utente = null)
     {
         // Get existing project to merge with patch data
         var existingProject = await GetProjectByCodeAsync(numeroProgetto, sessionId);
@@ -103,6 +119,12 @@ public class ProjectService : IProjectService
         {
             throw new InvalidOperationException($"Project {numeroProgetto} not found");
         }
+
+        // Salva una copia della versione originale per il confronto
+        var originalProject = JsonSerializer.Deserialize<ProjectDto>(
+            JsonSerializer.Serialize(existingProject),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+        ) ?? throw new InvalidOperationException("Failed to clone project");
 
         // Deserialize patch document to ProjectDto to merge collections properly
         var patchDto = JsonSerializer.Deserialize<ProjectDto>(patchDocument.GetRawText(), new JsonSerializerOptions 
@@ -154,9 +176,13 @@ public class ProjectService : IProjectService
                 existingProject.Prodotti?.Count ?? 0, numeroProgetto);
         }
 
+        // Confronta le versioni e genera le modifiche PRIMA dell'update
+        var changeLogEntries = GenerateChangeLogEntries(numeroProgetto, originalProject, existingProject, utente);
+
         // Use MapProjectToSapUDO to ensure collections are formatted correctly (same as PUT)
         // This approach worked before - collections were saved correctly
-        var sapUDO = ProjectMapper.MapProjectToSapUDO(existingProject);
+        // Include le modifiche nel payload SAP come collection
+        var sapUDO = ProjectMapper.MapProjectToSapUDO(existingProject, changeLogEntries);
         
         _logger.LogDebug("PATCH payload for project {NumeroProgetto} contains {Count} fields: {Fields}", 
             numeroProgetto, ((Dictionary<string, object?>)sapUDO).Count, 
@@ -165,13 +191,18 @@ public class ProjectService : IProjectService
         var result = await _sapClient.UpdateRecordAsync<JsonElement>(ProjectTable, numeroProgetto, sapUDO, sessionId);
         
         // SAP returns 204 No Content on PATCH, so re-fetch the updated project
+        ProjectDto updated;
         if (result.ValueKind == JsonValueKind.Undefined || result.ValueKind == JsonValueKind.Null)
         {
-            var updated = await GetProjectByCodeAsync(numeroProgetto, sessionId);
-            return updated ?? throw new InvalidOperationException($"Project {numeroProgetto} not found after patch");
+            updated = await GetProjectByCodeAsync(numeroProgetto, sessionId) 
+                ?? throw new InvalidOperationException($"Project {numeroProgetto} not found after patch");
         }
-        
-        return ProjectMapper.MapSapUDOToProject(result);
+        else
+        {
+            updated = ProjectMapper.MapSapUDOToProject(result);
+        }
+
+        return updated;
     }
 
     public async Task DeleteProjectAsync(string numeroProgetto, string sessionId)
@@ -252,6 +283,8 @@ public class ProjectService : IProjectService
             return new List<StoricoModificaDto>();
         
         var storico = new List<StoricoModificaDto>();
+        
+        // Leggi AX_ADT_PROHISTCollection (storico modifiche tradizionale)
         if (sapData.TryGetProperty("AX_ADT_PROHISTCollection", out var storicoArray) && storicoArray.ValueKind == JsonValueKind.Array)
         {
             foreach (var item in storicoArray.EnumerateArray())
@@ -259,6 +292,9 @@ public class ProjectService : IProjectService
                 storico.Add(ProjectMapper.MapStoricoFromSap(item));
             }
         }
+        
+        // NOTA: I ChangeLog vengono restituiti direttamente tramite GetChangeLogAsync o nel progetto.ChangeLog
+        // Non li includiamo qui per evitare duplicati - vengono gestiti separatamente nell'endpoint
         
         return storico;
     }
@@ -353,14 +389,18 @@ public class ProjectService : IProjectService
     public async Task<MessaggioProgettoDto> UpdateMessaggioAsync(string numeroProgetto, string messaggioId, MessaggioProgettoDto messaggio, string sessionId)
     {
         messaggio.Id = messaggioId;
-        var payload = MapMessaggioToSap(numeroProgetto, messaggio);
-        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(MessaggiTable, BuildMessageCode(numeroProgetto, messaggioId), payload, sessionId);
+        var payload = MapMessaggioToSap(numeroProgetto, messaggio, isUpdate: true, existingCode: messaggioId);
+        // Use messaggioId directly as Code if it looks like a GUID, otherwise use BuildMessageCode for backward compatibility
+        var code = IsGuid(messaggioId) ? messaggioId : BuildMessageCode(numeroProgetto, messaggioId);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(MessaggiTable, code, payload, sessionId);
         return ProjectMapper.MapMessaggioFromSap(updated, numeroProgetto);
     }
 
     public async Task DeleteMessaggioAsync(string numeroProgetto, string messaggioId, string sessionId)
     {
-        await _sapClient.DeleteRecordAsync(MessaggiTable, BuildMessageCode(numeroProgetto, messaggioId), sessionId);
+        // Use messaggioId directly as Code if it looks like a GUID, otherwise use BuildMessageCode for backward compatibility
+        var code = IsGuid(messaggioId) ? messaggioId : BuildMessageCode(numeroProgetto, messaggioId);
+        await _sapClient.DeleteRecordAsync(MessaggiTable, code, sessionId);
     }
 
     public async Task<List<ChangeLogDto>> GetChangeLogAsync(string numeroProgetto, string sessionId)
@@ -640,16 +680,29 @@ public class ProjectService : IProjectService
         }
     }
 
-    private object MapMessaggioToSap(string numeroProgetto, MessaggioProgettoDto messaggio)
+    private object MapMessaggioToSap(string numeroProgetto, MessaggioProgettoDto messaggio, bool isUpdate = false, string? existingCode = null)
     {
-        var ensuredId = messaggio.Id;
-        messaggio.Id = ensuredId;
-        var code = BuildMessageCode(numeroProgetto, ensuredId);
+        string code;
+        string name;
+
+        if (isUpdate && !string.IsNullOrEmpty(existingCode))
+        {
+            // For updates, use the existing Code
+            code = existingCode;
+            name = existingCode;
+        }
+        else
+        {
+            // For new messages, generate a unique GUID for Code and Name to avoid conflicts
+            var uniqueGuid = Guid.NewGuid().ToString("N");
+            code = uniqueGuid;
+            name = uniqueGuid;
+        }
 
         return new
         {
             Code = code,
-            Name = $"{numeroProgetto}-MSG{ensuredId}",
+            Name = name,
             U_Project = numeroProgetto,
             U_Data = messaggio.Data == default ? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss") : messaggio.Data.ToString("yyyy-MM-ddTHH:mm:ss"),
             U_Utente = messaggio.Utente,
@@ -657,6 +710,11 @@ public class ProjectService : IProjectService
             U_Tipo = messaggio.Tipo,
             U_Allegato = messaggio.Allegato
         };
+    }
+
+    private static bool IsGuid(string value)
+    {
+        return Guid.TryParse(value, out _) || (value.Length == 32 && value.All(c => char.IsLetterOrDigit(c)));
     }
 
     private static string BuildMessageCode(string numeroProgetto, string messaggioId) => $"{numeroProgetto}-MSG{messaggioId}";
@@ -765,6 +823,256 @@ public class ProjectService : IProjectService
             return $"\"{value.Replace("\"", "\"\"")}\"";
         }
         return value;
+    }
+
+    /// <summary>
+    /// Confronta due versioni di ProjectDto e genera una lista di modifiche
+    /// </summary>
+    private List<Dictionary<string, string>> CompareProjectVersions(ProjectDto oldVersion, ProjectDto newVersion)
+    {
+        var changes = new List<Dictionary<string, string>>();
+
+        // Confronta le proprietà semplici
+        CompareProperty("Cliente", oldVersion.Cliente, newVersion.Cliente, changes);
+        CompareProperty("NomeProgetto", oldVersion.NomeProgetto, newVersion.NomeProgetto, changes);
+        CompareProperty("Citta", oldVersion.Citta, newVersion.Citta, changes);
+        CompareProperty("Stato", oldVersion.Stato, newVersion.Stato, changes);
+        CompareProperty("TeamTecnico", oldVersion.TeamTecnico, newVersion.TeamTecnico, changes);
+        CompareProperty("TeamAPL", oldVersion.TeamAPL, newVersion.TeamAPL, changes);
+        CompareProperty("Sales", oldVersion.Sales, newVersion.Sales, changes);
+        CompareProperty("ProjectManager", oldVersion.ProjectManager, newVersion.ProjectManager, changes);
+        CompareProperty("TeamInstallazione", oldVersion.TeamInstallazione, newVersion.TeamInstallazione, changes);
+        CompareProperty("VersioneWIC", oldVersion.VersioneWIC, newVersion.VersioneWIC, changes);
+        CompareProperty("Note", oldVersion.Note, newVersion.Note, changes);
+
+        // Confronta date (normalizzate senza timezone)
+        CompareDateProperty("DataCreazione", oldVersion.DataCreazione, newVersion.DataCreazione, changes);
+        CompareDateProperty("DataInizioInstallazione", oldVersion.DataInizioInstallazione, newVersion.DataInizioInstallazione, changes);
+        CompareDateProperty("DataFineInstallazione", oldVersion.DataFineInstallazione, newVersion.DataFineInstallazione, changes);
+        CompareDateProperty("UltimaModifica", oldVersion.UltimaModifica, newVersion.UltimaModifica, changes);
+
+        // Confronta enum e bool
+        CompareProperty("StatoProgetto", oldVersion.StatoProgetto.ToString(), newVersion.StatoProgetto.ToString(), changes);
+        CompareProperty("IsInRitardo", oldVersion.IsInRitardo.ToString(), newVersion.IsInRitardo.ToString(), changes);
+
+        // Confronta valori decimali (confronto numerico, non stringa)
+        CompareDecimalProperty("ValoreProgetto", oldVersion.ValoreProgetto, newVersion.ValoreProgetto, changes);
+        CompareDecimalProperty("MarginePrevisto", oldVersion.MarginePrevisto, newVersion.MarginePrevisto, changes);
+        CompareDecimalProperty("CostiSostenuti", oldVersion.CostiSostenuti, newVersion.CostiSostenuti, changes);
+        CompareDecimalProperty("QuantitaTotaleMq", oldVersion.QuantitaTotaleMq, newVersion.QuantitaTotaleMq, changes);
+        CompareDecimalProperty("QuantitaTotaleFt", oldVersion.QuantitaTotaleFt, newVersion.QuantitaTotaleFt, changes);
+
+        // Confronta collezioni (livelli e prodotti)
+        CompareCollections("Livelli", oldVersion.Livelli, newVersion.Livelli, changes);
+        CompareCollections("Prodotti", oldVersion.Prodotti, newVersion.Prodotti, changes);
+
+        return changes;
+    }
+
+    /// <summary>
+    /// Confronta una singola proprietà e aggiunge la modifica alla lista se diversa
+    /// </summary>
+    private void CompareProperty(string propertyName, string? oldValue, string? newValue, List<Dictionary<string, string>> changes)
+    {
+        var oldVal = oldValue ?? "";
+        var newVal = newValue ?? "";
+
+        if (oldVal != newVal)
+        {
+            changes.Add(new Dictionary<string, string>
+            {
+                ["Campo"] = propertyName,
+                ["ValorePrecedente"] = oldVal,
+                ["NuovoValore"] = newVal
+            });
+        }
+    }
+
+    /// <summary>
+    /// Confronta una proprietà di tipo DateTime confrontando solo la parte data (yyyy-MM-dd), ignorando ora e timezone
+    /// </summary>
+    private void CompareDateProperty(string propertyName, DateTime? oldValue, DateTime? newValue, List<Dictionary<string, string>> changes)
+    {
+        // Se entrambi sono null, non c'è modifica
+        if (!oldValue.HasValue && !newValue.HasValue)
+            return;
+
+        // Se uno è null e l'altro no, c'è modifica
+        if (!oldValue.HasValue || !newValue.HasValue)
+        {
+            changes.Add(new Dictionary<string, string>
+            {
+                ["Campo"] = propertyName,
+                ["ValorePrecedente"] = oldValue?.ToString("yyyy-MM-dd") ?? "",
+                ["NuovoValore"] = newValue?.ToString("yyyy-MM-dd") ?? ""
+            });
+            return;
+        }
+
+        // Confronta solo la parte data (yyyy-MM-dd), ignorando completamente ora e timezone
+        var oldDate = oldValue.Value;
+        var newDate = newValue.Value;
+
+        // Estrai solo la parte data (primi 10 caratteri: yyyy-MM-dd)
+        var oldDateOnly = new DateTime(oldDate.Year, oldDate.Month, oldDate.Day);
+        var newDateOnly = new DateTime(newDate.Year, newDate.Month, newDate.Day);
+
+        // Confronta solo la data (ignora ora, minuti, secondi e timezone)
+        if (oldDateOnly != newDateOnly)
+        {
+            changes.Add(new Dictionary<string, string>
+            {
+                ["Campo"] = propertyName,
+                ["ValorePrecedente"] = oldDate.ToString("yyyy-MM-dd"),
+                ["NuovoValore"] = newDate.ToString("yyyy-MM-dd")
+            });
+        }
+    }
+
+    /// <summary>
+    /// Confronta una proprietà di tipo decimal ignorando le differenze di formato
+    /// </summary>
+    private void CompareDecimalProperty(string propertyName, decimal? oldValue, decimal? newValue, List<Dictionary<string, string>> changes)
+    {
+        // Normalizza i valori: considera null, 0, e valori vuoti come equivalenti
+        var oldNormalized = NormalizeDecimal(oldValue);
+        var newNormalized = NormalizeDecimal(newValue);
+
+        // Se entrambi sono null/zero dopo la normalizzazione, non c'è modifica
+        if (!oldNormalized.HasValue && !newNormalized.HasValue)
+            return;
+
+        // Se uno è null/zero e l'altro no, c'è modifica
+        if (!oldNormalized.HasValue || !newNormalized.HasValue)
+        {
+            changes.Add(new Dictionary<string, string>
+            {
+                ["Campo"] = propertyName,
+                ["ValorePrecedente"] = oldValue?.ToString() ?? "",
+                ["NuovoValore"] = newValue?.ToString() ?? ""
+            });
+            return;
+        }
+
+        // Confronta i valori numerici (non le stringhe) con una tolleranza per arrotondamenti
+        var difference = Math.Abs(oldNormalized.Value - newNormalized.Value);
+        if (difference > 0.0001m) // Tolleranza per arrotondamenti floating point
+        {
+            changes.Add(new Dictionary<string, string>
+            {
+                ["Campo"] = propertyName,
+                ["ValorePrecedente"] = oldValue?.ToString() ?? "",
+                ["NuovoValore"] = newValue?.ToString() ?? ""
+            });
+        }
+    }
+
+    /// <summary>
+    /// Normalizza un valore decimal: restituisce null se il valore è 0 o null
+    /// </summary>
+    private decimal? NormalizeDecimal(decimal? value)
+    {
+        if (!value.HasValue || value.Value == 0)
+            return null;
+        return value.Value;
+    }
+
+    /// <summary>
+    /// Confronta due collezioni e registra le modifiche solo se ci sono differenze sostanziali
+    /// </summary>
+    private void CompareCollections<T>(string collectionName, List<T>? oldCollection, List<T>? newCollection, List<Dictionary<string, string>> changes)
+    {
+        var oldCount = oldCollection?.Count ?? 0;
+        var newCount = newCollection?.Count ?? 0;
+
+        if (oldCount != newCount)
+        {
+            changes.Add(new Dictionary<string, string>
+            {
+                ["Campo"] = collectionName,
+                ["ValorePrecedente"] = oldCount.ToString(),
+                ["NuovoValore"] = newCount.ToString()
+            });
+        }
+        else if (oldCount > 0 && newCount > 0)
+        {
+            // Confronta il contenuto serializzato, ma normalizza prima per ignorare differenze di formato
+            var oldJson = NormalizeJsonForComparison(JsonSerializer.Serialize(oldCollection ?? new List<T>()));
+            var newJson = NormalizeJsonForComparison(JsonSerializer.Serialize(newCollection ?? new List<T>()));
+            
+            if (oldJson != newJson)
+            {
+                changes.Add(new Dictionary<string, string>
+                {
+                    ["Campo"] = $"{collectionName} (contenuto)",
+                    ["ValorePrecedente"] = $"{oldCount} elementi",
+                    ["NuovoValore"] = $"{newCount} elementi (contenuto modificato)"
+                });
+            }
+        }
+    }
+
+    /// <summary>
+    /// Normalizza un JSON per il confronto, rimuovendo differenze di formato (decimali, spazi, etc.)
+    /// </summary>
+    private string NormalizeJsonForComparison(string json)
+    {
+        if (string.IsNullOrEmpty(json))
+            return "";
+
+        // Rimuovi spazi e newline
+        var normalized = json.Replace(" ", "").Replace("\n", "").Replace("\r", "");
+        
+        // Normalizza i decimali: "100000.0" -> "100000", "0.0" -> "0"
+        // Usa regex per sostituire pattern come "100000.0" o "0.0" con la versione senza .0
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"(\d+)\.0+(\D|$)", "$1$2");
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"(\d+)\.0+""", "$1\"");
+        
+        return normalized;
+    }
+
+    /// <summary>
+    /// Genera le entry del ChangeLog confrontando due versioni del progetto
+    /// </summary>
+    private List<ChangeLogDto> GenerateChangeLogEntries(string numeroProgetto, ProjectDto oldVersion, ProjectDto newVersion, string? utente)
+    {
+        var changeLogEntries = new List<ChangeLogDto>();
+
+        try
+        {
+            var changes = CompareProjectVersions(oldVersion, newVersion);
+
+            if (changes.Count == 0)
+            {
+                _logger.LogDebug("Nessuna modifica rilevata per il progetto {NumeroProgetto}", numeroProgetto);
+                return changeLogEntries;
+            }
+
+            // Crea un ChangeLog entry con tutte le modifiche nei dettagli
+            // Questa entry verrà inclusa come collection nel payload SAP
+            var changeLog = new ChangeLogDto
+            {
+                NumeroProgetto = numeroProgetto,
+                Data = DateTime.UtcNow,
+                Utente = utente ?? "System",
+                Azione = "updated",
+                Descrizione = $"Modificati {changes.Count} campo/i",
+                Dettagli = changes.ToDictionary(
+                    c => c["Campo"],
+                    c => $"Da: {c["ValorePrecedente"]} -> A: {c["NuovoValore"]}"
+                )
+            };
+
+            changeLogEntries.Add(changeLog);
+            _logger.LogInformation("Generate {Count} modifiche per il ChangeLog del progetto {NumeroProgetto}", changes.Count, numeroProgetto);
+        }
+        catch (Exception ex)
+        {
+            // Log dell'errore ma non bloccare l'update del progetto
+            _logger.LogError(ex, "Errore durante la generazione delle modifiche per il ChangeLog del progetto {NumeroProgetto}", numeroProgetto);
+        }
+
+        return changeLogEntries;
     }
 }
 

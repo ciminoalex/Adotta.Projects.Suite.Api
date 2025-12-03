@@ -8,8 +8,8 @@ public interface IProjectService
     Task<List<ProjectDto>> GetAllProjectsAsync(string sessionId);
     Task<ProjectDto?> GetProjectByCodeAsync(string numeroProgetto, string sessionId);
     Task<ProjectDto> CreateProjectAsync(ProjectDto project, string sessionId);
-    Task<ProjectDto> UpdateProjectAsync(string numeroProgetto, ProjectDto project, string sessionId);
-    Task<ProjectDto> PatchProjectAsync(string numeroProgetto, JsonElement patchDocument, string sessionId);
+    Task<ProjectDto> UpdateProjectAsync(string numeroProgetto, ProjectDto project, string sessionId, string? utente = null);
+    Task<ProjectDto> PatchProjectAsync(string numeroProgetto, JsonElement patchDocument, string sessionId, string? utente = null);
     Task DeleteProjectAsync(string numeroProgetto, string sessionId);
     Task<List<ProjectDto>> SearchProjectsAsync(string searchTerm, string sessionId);
     Task<List<ProjectDto>> FilterProjectsAsync(FilterRequestDto filter, string sessionId);

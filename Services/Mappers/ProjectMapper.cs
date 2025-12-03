@@ -8,7 +8,7 @@ namespace ADOTTA.Projects.Suite.Api.Services.Mappers;
 
 public static class ProjectMapper
 {
-    public static object MapProjectToSapUDO(ProjectDto dto)
+    public static object MapProjectToSapUDO(ProjectDto dto, List<ChangeLogDto>? changeLogEntries = null)
     {
         var result = new Dictionary<string, object?>
         {
@@ -68,6 +68,21 @@ public static class ProjectMapper
                 U_QMq = p.QMq,
                 U_QFt = p.QFt,
                 U_LivelloId = p.LivelloId?.ToString() ?? ""
+            }).ToList();
+        }
+
+        // Include ChangeLog collection if provided
+        if (changeLogEntries != null && changeLogEntries.Count > 0)
+        {
+            result["AX_ADT_PROCHGCollection"] = changeLogEntries.Select((chg, idx) => new
+            {
+                Code = dto.NumeroProgetto,
+                U_Project = dto.NumeroProgetto,
+                U_Data = chg.Data.ToString("yyyy-MM-ddTHH:mm:ss"),
+                U_Utente = chg.Utente,
+                U_Azione = chg.Azione,
+                U_Descrizione = chg.Descrizione,
+                U_DettagliJson = System.Text.Json.JsonSerializer.Serialize(chg.Dettagli ?? new Dictionary<string, string>())
             }).ToList();
         }
 

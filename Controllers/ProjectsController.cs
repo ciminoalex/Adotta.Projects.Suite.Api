@@ -28,6 +28,29 @@ public class ProjectsController : ControllerBase
 
     private string GetSessionId() => HttpContext.GetSapSessionId();
 
+    private string? GetCurrentUser()
+    {
+        // Prova a recuperare l'utente dai claim JWT
+        var userName = HttpContext.User?.Claims
+            .FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Name)?.Value;
+        
+        if (!string.IsNullOrWhiteSpace(userName))
+            return userName;
+
+        // Fallback su UniqueName (UserCode)
+        var userCode = HttpContext.User?.Claims
+            .FirstOrDefault(c => c.Type == System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.UniqueName)?.Value;
+        
+        if (!string.IsNullOrWhiteSpace(userCode))
+            return userCode;
+
+        // Fallback su Email
+        var email = HttpContext.User?.Claims
+            .FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Email)?.Value;
+        
+        return email;
+    }
+
     [HttpGet]
     public async Task<ActionResult<List<ProjectDto>>> GetAll()
     {
@@ -101,7 +124,8 @@ public class ProjectsController : ControllerBase
     {
         try
         {
-            var updated = await _projectService.UpdateProjectAsync(numeroProgetto, project, GetSessionId());
+            var utente = GetCurrentUser();
+            var updated = await _projectService.UpdateProjectAsync(numeroProgetto, project, GetSessionId(), utente);
             return Ok(updated);
         }
         catch (Exception ex)
@@ -116,7 +140,8 @@ public class ProjectsController : ControllerBase
     {
         try
         {
-            var updated = await _projectService.PatchProjectAsync(numeroProgetto, patchDocument, GetSessionId());
+            var utente = GetCurrentUser();
+            var updated = await _projectService.PatchProjectAsync(numeroProgetto, patchDocument, GetSessionId(), utente);
             return Ok(updated);
         }
         catch (ArgumentException ex)
@@ -327,12 +352,31 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpGet("{numeroProgetto}/storico")]
-    public async Task<ActionResult<List<StoricoModificaDto>>> GetStorico(string numeroProgetto)
+    public async Task<ActionResult<object>> GetStorico(string numeroProgetto)
     {
         try
         {
+            // Restituisce sia StoricoModifica che ChangeLog
+            // Il ChangeLog viene restituito con la stessa struttura del modello del progetto
+            var project = await _projectService.GetProjectByCodeAsync(numeroProgetto, GetSessionId());
+            if (project == null)
+            {
+                return NotFound(new { message = $"Project '{numeroProgetto}' not found" });
+            }
+
+            var result = new List<object>();
+            
+            // Aggiungi StoricoModifica tradizionale
             var storico = await _projectService.GetStoricoAsync(numeroProgetto, GetSessionId());
-            return Ok(storico);
+            result.AddRange(storico);
+            
+            // Aggiungi ChangeLog con la stessa struttura del modello del progetto
+            if (project.ChangeLog != null && project.ChangeLog.Count > 0)
+            {
+                result.AddRange(project.ChangeLog);
+            }
+            
+            return Ok(result);
         }
         catch (Exception ex)
         {
