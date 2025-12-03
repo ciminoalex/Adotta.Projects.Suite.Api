@@ -21,11 +21,11 @@ public class TimesheetService : ITimesheetService
         return sapData.Select(MapToTimesheetDto).ToList();
     }
 
-    public async Task<TimesheetEntryDto?> GetEntryByIdAsync(int id, string sessionId)
+    public async Task<TimesheetEntryDto?> GetEntryByIdAsync(string code, string sessionId)
     {
         try
         {
-            var entry = await _sapClient.GetRecordAsync<JsonElement>("AX_ADT_TIMESHEET", id.ToString(), sessionId);
+            var entry = await _sapClient.GetRecordAsync<JsonElement>("AX_ADT_TIMESHEET", code, sessionId);
             if (entry.ValueKind == JsonValueKind.Undefined || entry.ValueKind == JsonValueKind.Null) return null;
             return MapToTimesheetDto(entry);
         }
@@ -37,21 +37,24 @@ public class TimesheetService : ITimesheetService
 
     public async Task<TimesheetEntryDto> CreateEntryAsync(TimesheetEntryDto entry, string sessionId)
     {
-        var sapData = MapTimesheetToSap(entry);
+        // Durante la creazione il Code/Name in SAP deve essere un GUID univoco
+        var code = Guid.NewGuid().ToString();
+        var sapData = MapTimesheetToSap(entry, code);
         var result = await _sapClient.CreateRecordAsync<JsonElement>("AX_ADT_TIMESHEET", sapData, sessionId);
         return MapToTimesheetDto(result);
     }
 
-    public async Task<TimesheetEntryDto> UpdateEntryAsync(int id, TimesheetEntryDto entry, string sessionId)
+    public async Task<TimesheetEntryDto> UpdateEntryAsync(string code, TimesheetEntryDto entry, string sessionId)
     {
-        var sapData = MapTimesheetToSap(entry);
-        var result = await _sapClient.UpdateRecordAsync<JsonElement>("AX_ADT_TIMESHEET", id.ToString(), sapData, sessionId);
+        // In fase di update utilizziamo l'ID esistente come Code/Name
+        var sapData = MapTimesheetToSap(entry, code);
+        var result = await _sapClient.UpdateRecordAsync<JsonElement>("AX_ADT_TIMESHEET", code, sapData, sessionId);
         return MapToTimesheetDto(result);
     }
 
-    public async Task DeleteEntryAsync(int id, string sessionId)
+    public async Task DeleteEntryAsync(string code, string sessionId)
     {
-        await _sapClient.DeleteRecordAsync("AX_ADT_TIMESHEET", id.ToString(), sessionId);
+        await _sapClient.DeleteRecordAsync("AX_ADT_TIMESHEET", code, sessionId);
     }
 
     public async Task<List<TimesheetEntryDto>> GetEntriesByProjectAsync(string numeroProgetto, string sessionId)
@@ -151,7 +154,7 @@ public class TimesheetService : ITimesheetService
     {
         return new TimesheetEntryDto
         {
-            Id = sapData.TryGetProperty("Code", out var code) ? int.Parse(code.GetString() ?? "0") : 0,
+            Id = sapData.TryGetProperty("Code", out var code) ? code.GetString() ?? string.Empty : string.Empty,
             ProgettoId = sapData.TryGetProperty("U_Progetto", out var proj) ? proj.GetString() ?? "" : "",
             NumeroProgetto = sapData.TryGetProperty("U_NumeroProgetto", out var num) ? num.GetString() ?? "" : "",
             NomeProgetto = sapData.TryGetProperty("U_NomeProgetto", out var name) ? name.GetString() ?? "" : "",
@@ -168,11 +171,12 @@ public class TimesheetService : ITimesheetService
         };
     }
 
-    private object MapTimesheetToSap(TimesheetEntryDto dto)
+    private object MapTimesheetToSap(TimesheetEntryDto dto, string code)
     {
         return new
         {
-            Code = dto.Id.ToString(),
+            Code = code,
+            Name = code,
             U_Progetto = dto.ProgettoId,
             U_NumeroProgetto = dto.NumeroProgetto,
             U_NomeProgetto = dto.NomeProgetto,
