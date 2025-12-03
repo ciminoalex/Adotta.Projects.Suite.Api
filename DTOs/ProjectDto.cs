@@ -31,7 +31,6 @@ public class ProjectDto
     public decimal? QuantitaTotaleFt { get; set; }
     public List<StoricoModificaDto>? Storico { get; set; }
     public List<MessaggioProgettoDto>? Messaggi { get; set; }
-    public List<ChangeLogDto>? ChangeLog { get; set; }
 }
 
 public class LivelloProgettoDto
@@ -62,13 +61,11 @@ public class StoricoModificaDto
 {
     public int Id { get; set; }
     public string NumeroProgetto { get; set; } = string.Empty;
-    public DateTime DataModifica { get; set; }
-    public string UtenteModifica { get; set; } = string.Empty;
-    public string CampoModificato { get; set; } = string.Empty;
-    public string? ValorePrecedente { get; set; }
-    public string? NuovoValore { get; set; }
-    public string? VersioneWIC { get; set; }
-    public string? Descrizione { get; set; }
+    public DateTime Data { get; set; }
+    public string Utente { get; set; } = string.Empty;
+    public string Azione { get; set; } = string.Empty; // 'created', 'updated', 'deleted', etc.
+    public string Descrizione { get; set; } = string.Empty;
+    public Dictionary<string, string>? Dettagli { get; set; }
 }
 
 public class ProjectExportRequestDto

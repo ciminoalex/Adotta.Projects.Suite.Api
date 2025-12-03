@@ -23,13 +23,10 @@ public interface IProjectService
     Task<ProdottoProgettoDto> UpdateProdottoAsync(string numeroProgetto, int prodottoId, ProdottoProgettoDto prodotto, string sessionId);
     Task DeleteProdottoAsync(string numeroProgetto, int prodottoId, string sessionId);
     Task<List<StoricoModificaDto>> GetStoricoAsync(string numeroProgetto, string sessionId);
-    Task<List<StoricoModificaDto>> CreateWicSnapshotAsync(string numeroProgetto, string sessionId);
     Task<List<MessaggioProgettoDto>> GetMessaggiAsync(string numeroProgetto, string sessionId);
     Task<MessaggioProgettoDto> CreateMessaggioAsync(string numeroProgetto, MessaggioProgettoDto messaggio, string sessionId);
     Task<MessaggioProgettoDto> UpdateMessaggioAsync(string numeroProgetto, string messaggioId, MessaggioProgettoDto messaggio, string sessionId);
     Task DeleteMessaggioAsync(string numeroProgetto, string messaggioId, string sessionId);
-    Task<List<ChangeLogDto>> GetChangeLogAsync(string numeroProgetto, string sessionId);
-    Task<ChangeLogDto> CreateChangeLogAsync(string numeroProgetto, ChangeLogDto change, string sessionId);
     Task<ProjectExportResultDto> ExportProjectsAsync(string format, ProjectExportRequestDto request, string sessionId);
     Task<ProjectStatsDto> GetProjectStatsAsync(string sessionId);
     Task<List<ProjectStatsByStatusDto>> GetStatsByStatusAsync(string sessionId);
