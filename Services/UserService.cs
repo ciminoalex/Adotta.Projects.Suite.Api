@@ -28,11 +28,11 @@ public class UserService : IUserService
         return sapData.Select(record => MapToUserDto(record)).ToList();
     }
 
-    public async Task<UserDto?> GetUserByIdAsync(int id, string sessionId)
+    public async Task<UserDto?> GetUserByIdAsync(string code, string sessionId)
     {
         try
         {
-            var record = await _sapClient.GetRecordAsync<JsonElement>(TableName, id.ToString(), sessionId);
+            var record = await _sapClient.GetRecordAsync<JsonElement>(TableName, code, sessionId);
             if (record.ValueKind == JsonValueKind.Undefined || record.ValueKind == JsonValueKind.Null)
             {
                 return null;
@@ -42,7 +42,7 @@ public class UserService : IUserService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving user {UserId}", id);
+            _logger.LogError(ex, "Error retrieving user {UserCode}", code);
             return null;
         }
     }
@@ -74,26 +74,24 @@ public class UserService : IUserService
         return MapToUserDto(created);
     }
 
-    public async Task<UserDto> UpdateUserAsync(int id, UserDto user, string sessionId)
+    public async Task<UserDto> UpdateUserAsync(string code, UserDto user, string sessionId)
     {
-        user.Id = id;
+        user.Code = code;
         var sapPayload = MapToSapRecord(user, isUpdate: true);
-        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(TableName, id.ToString(), sapPayload, sessionId);
+        var updated = await _sapClient.UpdateRecordAsync<JsonElement>(TableName, code, sapPayload, sessionId);
         return MapToUserDto(updated);
     }
 
-    public async Task DeleteUserAsync(int id, string sessionId)
+    public async Task DeleteUserAsync(string code, string sessionId)
     {
-        await _sapClient.DeleteRecordAsync(TableName, id.ToString(), sessionId);
+        await _sapClient.DeleteRecordAsync(TableName, code, sessionId);
     }
 
     private UserDto MapToUserDto(JsonElement record, bool includeSensitive = false)
     {
         return new UserDto
         {
-            Id = record.TryGetProperty("Code", out var codeProp) && int.TryParse(codeProp.GetString(), out var code)
-                ? code
-                : 0,
+            Code = record.TryGetProperty("Code", out var codeProp) ? codeProp.GetString() ?? string.Empty : string.Empty,
             UserCode = record.TryGetProperty("U_Username", out var username) ? username.GetString() ?? string.Empty : string.Empty,
             Email = record.TryGetProperty("U_Email", out var email) ? email.GetString() ?? string.Empty : string.Empty,
             UserName = record.TryGetProperty("Name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
@@ -110,10 +108,10 @@ public class UserService : IUserService
 
     private object MapToSapRecord(UserDto user, bool isUpdate)
     {
-        var code = user.Id > 0 ? user.Id.ToString() : Guid.NewGuid().ToString("N");
+        var code = !string.IsNullOrWhiteSpace(user.Code) ? user.Code : Guid.NewGuid().ToString("N");
         var payload = new Dictionary<string, object?>
         {
-            ["Code"] = isUpdate ? user.Id.ToString() : code,
+            ["Code"] = isUpdate ? user.Code : code,
             ["Name"] = user.UserName,
             ["U_Username"] = user.UserCode,
             ["U_Email"] = user.Email,

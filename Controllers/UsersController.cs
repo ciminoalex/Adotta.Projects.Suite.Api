@@ -37,21 +37,21 @@ public class UsersController : ControllerBase
         }
     }
 
-    [HttpGet("{id:int}")]
-    public async Task<ActionResult<UserDto>> GetById(int id)
+    [HttpGet("{code}")]
+    public async Task<ActionResult<UserDto>> GetById(string code)
     {
         try
         {
-            var user = await _userService.GetUserByIdAsync(id, GetSessionId());
+            var user = await _userService.GetUserByIdAsync(code, GetSessionId());
             if (user == null)
             {
-                return NotFound(new { message = $"User '{id}' not found" });
+                return NotFound(new { message = $"User '{code}' not found" });
             }
             return Ok(user);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving user {UserId}", id);
+            _logger.LogError(ex, "Error retrieving user {UserCode}", code);
             return StatusCode(500, new { message = "Error retrieving user", error = ex.Message });
         }
     }
@@ -62,7 +62,7 @@ public class UsersController : ControllerBase
         try
         {
             var created = await _userService.CreateUserAsync(user, GetSessionId());
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+            return CreatedAtAction(nameof(GetById), new { code = created.Code }, created);
         }
         catch (Exception ex)
         {
@@ -71,32 +71,32 @@ public class UsersController : ControllerBase
         }
     }
 
-    [HttpPut("{id:int}")]
-    public async Task<ActionResult<UserDto>> Update(int id, [FromBody] UserDto user)
+    [HttpPut("{code}")]
+    public async Task<ActionResult<UserDto>> Update(string code, [FromBody] UserDto user)
     {
         try
         {
-            var updated = await _userService.UpdateUserAsync(id, user, GetSessionId());
+            var updated = await _userService.UpdateUserAsync(code, user, GetSessionId());
             return Ok(updated);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating user {UserId}", id);
+            _logger.LogError(ex, "Error updating user {UserCode}", code);
             return StatusCode(500, new { message = "Error updating user", error = ex.Message });
         }
     }
 
-    [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id)
+    [HttpDelete("{code}")]
+    public async Task<IActionResult> Delete(string code)
     {
         try
         {
-            await _userService.DeleteUserAsync(id, GetSessionId());
+            await _userService.DeleteUserAsync(code, GetSessionId());
             return NoContent();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting user {UserId}", id);
+            _logger.LogError(ex, "Error deleting user {UserCode}", code);
             return StatusCode(500, new { message = "Error deleting user", error = ex.Message });
         }
     }
