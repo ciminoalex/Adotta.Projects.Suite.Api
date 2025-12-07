@@ -44,9 +44,8 @@ public class InitializationService : IInitializationService
             new { Name = "AX_ADT_PROJECT", Description = "Adt Prjs: Progetti", Type = "bott_MasterData" },
             new { Name = "AX_ADT_PROJLVL", Description = "Adt Prjs: Livelli", Type = "bott_MasterDataLines" },
             new { Name = "AX_ADT_PROPRD", Description = "Adt Prjs: Prodotti", Type = "bott_MasterDataLines" },
-            new { Name = "AX_ADT_PROHIST", Description = "Adt Prjs: Storico", Type = "bott_MasterDataLines" },
             new { Name = "AX_ADT_PROMSG", Description = "Adt Prjs: Messaggi", Type = "bott_MasterData" },
-            new { Name = "AX_ADT_PROCHG", Description = "Adt Prjs: ChangeLog", Type = "bott_MasterDataLines" },
+            new { Name = "AX_ADT_PROCHG", Description = "Adt Prjs: ChangeLog", Type = "bott_MasterData" },
             new { Name = "AX_ADT_STATI", Description = "Adt Prjs: Stati", Type = "bott_MasterData" },
             new { Name = "AX_ADT_CITTA", Description = "Adt Prjs: Città", Type = "bott_MasterData" },
             new { Name = "AX_ADT_TEAMTECH", Description = "Adt Prjs: Team Tecnici", Type = "bott_MasterData" },
@@ -130,14 +129,6 @@ public class InitializationService : IInitializationService
             ("@AX_ADT_PROPRD", new { Name = "QMq", Type = "db_Float", Description = "Quantità mq", TableName = "@AX_ADT_PROPRD", SubType = "st_Quantity" }),
             ("@AX_ADT_PROPRD", new { Name = "QFt", Type = "db_Float", Description = "Quantità ft", TableName = "@AX_ADT_PROPRD", SubType = "st_Quantity" }),
             ("@AX_ADT_PROPRD", new { Name = "LivelloId", Type = "db_Alpha", Size = 20, Description = "Livello collegato", TableName = "@AX_ADT_PROPRD", EditSize = 20, SubType = "st_None" }),
-
-            ("@AX_ADT_PROHIST", new { Name = "Parent", Type = "db_Alpha", Size = 30, Description = "Numero Progetto", TableName = "@AX_ADT_PROHIST", EditSize = 30, SubType = "st_None" }),
-            ("@AX_ADT_PROHIST", new { Name = "DataModifica", Type = "db_Date", Description = "Data Modifica", TableName = "@AX_ADT_PROHIST" }),
-            ("@AX_ADT_PROHIST", new { Name = "UtenteModifica", Type = "db_Alpha", Size = 50, Description = "Utente Modifica", TableName = "@AX_ADT_PROHIST", EditSize = 50, SubType = "st_None" }),
-            ("@AX_ADT_PROHIST", new { Name = "CampoModificato", Type = "db_Alpha", Size = 100, Description = "Campo Modificato", TableName = "@AX_ADT_PROHIST", EditSize = 100, SubType = "st_None" }),
-            ("@AX_ADT_PROHIST", new { Name = "ValorePrecedente", Type = "db_Memo", Description = "Valore Precedente", TableName = "@AX_ADT_PROHIST" }),
-            ("@AX_ADT_PROHIST", new { Name = "NuovoValore", Type = "db_Memo", Description = "Nuovo Valore", TableName = "@AX_ADT_PROHIST" }),
-            ("@AX_ADT_PROHIST", new { Name = "VersioneWIC", Type = "db_Alpha", Size = 20, Description = "Versione WIC", TableName = "@AX_ADT_PROHIST", EditSize = 20, SubType = "st_None" }),
 
             ("@AX_ADT_PROMSG", new { Name = "Project", Type = "db_Alpha", Size = 30, Description = "Numero Progetto", TableName = "@AX_ADT_PROMSG", EditSize = 30, SubType = "st_None" }),
             ("@AX_ADT_PROMSG", new { Name = "Data", Type = "db_Date", Description = "Data Messaggio", TableName = "@AX_ADT_PROMSG" }),
@@ -263,9 +254,7 @@ public class InitializationService : IInitializationService
             UserObjectMD_ChildTables = new[]
             {
                 new { ObjectName = "AX_ADT_PROJLVL", TableName = "AX_ADT_PROJLVL" },
-                new { ObjectName = "AX_ADT_PROPRD", TableName = "AX_ADT_PROPRD" },
-                new { ObjectName = "AX_ADT_PROHIST", TableName = "AX_ADT_PROHIST" },
-                new { ObjectName = "AX_ADT_PROCHG", TableName = "AX_ADT_PROCHG" }
+                new { ObjectName = "AX_ADT_PROPRD", TableName = "AX_ADT_PROPRD" }
             }
         };
 
@@ -284,7 +273,8 @@ public class InitializationService : IInitializationService
             new { Code = "AX_ADT_PRODMAST", Name = "Adt Prjs: Prod. Master", ObjectType = (string?)null },
             new { Code = "AX_ADT_TIMESHEET", Name = "Adt Prjs: Timesheet", ObjectType = (string?)null },
             new { Code = "AX_ADT_USERS", Name = "Adt Prjs: Users", ObjectType = (string?)null },
-            new { Code = "AX_ADT_PROMSG", Name = "Adt Prjs: Messaggi", ObjectType = (string?)null }
+            new { Code = "AX_ADT_PROMSG", Name = "Adt Prjs: Messaggi", ObjectType = (string?)null },
+            new { Code = "AX_ADT_PROCHG", Name = "Adt Prjs: ChangeLog", ObjectType = (string?)null }
         };
 
         foreach (var u in otherUdos)

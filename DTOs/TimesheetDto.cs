@@ -2,7 +2,7 @@ namespace ADOTTA.Projects.Suite.Api.DTOs;
 
 public class TimesheetEntryDto
 {
-    public int Id { get; set; }
+    public string Id { get; set; } = string.Empty;
     public string ProgettoId { get; set; } = string.Empty;
     public string NumeroProgetto { get; set; } = string.Empty;
     public string NomeProgetto { get; set; } = string.Empty;

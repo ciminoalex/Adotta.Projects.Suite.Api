@@ -8,7 +8,7 @@ namespace ADOTTA.Projects.Suite.Api.Services.Mappers;
 
 public static class ProjectMapper
 {
-    public static object MapProjectToSapUDO(ProjectDto dto, List<ChangeLogDto>? changeLogEntries = null)
+    public static object MapProjectToSapUDO(ProjectDto dto)
     {
         var result = new Dictionary<string, object?>
         {
@@ -71,21 +71,6 @@ public static class ProjectMapper
             }).ToList();
         }
 
-        // Include ChangeLog collection if provided
-        if (changeLogEntries != null && changeLogEntries.Count > 0)
-        {
-            result["AX_ADT_PROCHGCollection"] = changeLogEntries.Select((chg, idx) => new
-            {
-                Code = dto.NumeroProgetto,
-                U_Project = dto.NumeroProgetto,
-                U_Data = chg.Data.ToString("yyyy-MM-ddTHH:mm:ss"),
-                U_Utente = chg.Utente,
-                U_Azione = chg.Azione,
-                U_Descrizione = chg.Descrizione,
-                U_DettagliJson = System.Text.Json.JsonSerializer.Serialize(chg.Dettagli ?? new Dictionary<string, string>())
-            }).ToList();
-        }
-
         return result;
     }
 
@@ -137,30 +122,12 @@ public static class ProjectMapper
             }
         }
 
-        if (sapData.TryGetProperty("AX_ADT_PROHISTCollection", out var storicoArray) && storicoArray.ValueKind == JsonValueKind.Array)
-        {
-            project.Storico = new List<StoricoModificaDto>();
-            foreach (var storico in storicoArray.EnumerateArray())
-            {
-                project.Storico.Add(MapStoricoFromSap(storico));
-            }
-        }
-
         if (sapData.TryGetProperty("AX_ADT_PROMSGCollection", out var messaggiArray) && messaggiArray.ValueKind == JsonValueKind.Array)
         {
             project.Messaggi = new List<MessaggioProgettoDto>();
             foreach (var msg in messaggiArray.EnumerateArray())
             {
                 project.Messaggi.Add(MapMessaggioFromSap(msg, project.NumeroProgetto));
-            }
-        }
-
-        if (sapData.TryGetProperty("AX_ADT_PROCHGCollection", out var changeArray) && changeArray.ValueKind == JsonValueKind.Array)
-        {
-            project.ChangeLog = new List<ChangeLogDto>();
-            foreach (var change in changeArray.EnumerateArray())
-            {
-                project.ChangeLog.Add(MapChangeLogFromSap(change, project.NumeroProgetto));
             }
         }
 
@@ -277,21 +244,6 @@ public static class ProjectMapper
         };
     }
 
-    public static StoricoModificaDto MapStoricoFromSap(JsonElement sapData)
-    {
-        return new StoricoModificaDto
-        {
-            Id = sapData.TryGetProperty("Code", out var code) ? int.TryParse(code.GetString(), out var parsed) ? parsed : 0 : 0,
-            NumeroProgetto = sapData.TryGetProperty("U_Parent", out var parent) ? parent.GetString() ?? string.Empty : string.Empty,
-            DataModifica = sapData.TryGetProperty("U_DataModifica", out var date) && DateTime.TryParse(date.GetString(), out var dt) ? dt : DateTime.MinValue,
-            UtenteModifica = sapData.TryGetProperty("U_UtenteModifica", out var user) ? user.GetString() ?? string.Empty : string.Empty,
-            CampoModificato = sapData.TryGetProperty("U_CampoModificato", out var field) ? field.GetString() ?? string.Empty : string.Empty,
-            ValorePrecedente = sapData.TryGetProperty("U_ValorePrecedente", out var oldVal) ? oldVal.GetString() : null,
-            NuovoValore = sapData.TryGetProperty("U_NuovoValore", out var newVal) ? newVal.GetString() : null,
-            VersioneWIC = sapData.TryGetProperty("U_VersioneWIC", out var version) ? version.GetString() : null,
-            Descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() : null
-        };
-    }
 
     public static MessaggioProgettoDto MapMessaggioFromSap(JsonElement sapData, string numeroProgetto)
     {
@@ -358,9 +310,9 @@ public static class ProjectMapper
         };
     }
 
-    public static ChangeLogDto MapChangeLogFromSap(JsonElement sapData, string numeroProgetto)
+    public static StoricoModificaDto MapStoricoFromSap(JsonElement sapData, string numeroProgetto)
     {
-        var dettagliDict = default(Dictionary<string, string>?);
+        var dettagliDict = default(Dictionary<string, string>);
         if (sapData.TryGetProperty("U_DettagliJson", out var dett) && dett.ValueKind == JsonValueKind.String)
         {
             try
@@ -373,11 +325,76 @@ public static class ProjectMapper
             }
         }
 
-        return new ChangeLogDto
+        // Calcola la Data usando i campi di sistema CreateDate + CreateTime, con fallback su U_Data
+        DateTime dataEvento = DateTime.UtcNow;
+        try
+        {
+            if (sapData.TryGetProperty("CreateDate", out var createDateProp) &&
+                sapData.TryGetProperty("CreateTime", out var createTimeProp))
+            {
+                var createDateStr = createDateProp.GetString();
+                var createTimeStr = createTimeProp.GetString();
+
+                if (!string.IsNullOrWhiteSpace(createDateStr) && !string.IsNullOrWhiteSpace(createTimeStr))
+                {
+                    // 1) Prova prima a fare il parse diretto dei formati reali:
+                    //    - CreateDate: ISO8601, es. "2025-12-03T00:00:00Z"
+                    //    - CreateTime: orario "HH:mm:ss", es. "09:02:00"
+                    if (DateTime.TryParse(createDateStr, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var parsedDate) &&
+                        TimeSpan.TryParse(createTimeStr, out var parsedTime))
+                    {
+                        dataEvento = new DateTime(
+                            parsedDate.Year,
+                            parsedDate.Month,
+                            parsedDate.Day,
+                            parsedTime.Hours,
+                            parsedTime.Minutes,
+                            parsedTime.Seconds,
+                            DateTimeKind.Utc);
+                    }
+                    else
+                    {
+                        // 2) Fallback alla logica esistente per valori numerici (yyyyMMdd / HHmmss)
+                        if (int.TryParse(createDateStr, out var createDateInt))
+                        {
+                            createDateStr = createDateInt.ToString("00000000");
+                        }
+                        if (int.TryParse(createTimeStr, out var createTimeInt))
+                        {
+                            createTimeStr = createTimeInt.ToString("000000");
+                        }
+
+                        if (createDateStr.Length == 8 && createTimeStr.Length == 6)
+                        {
+                            var year = int.Parse(createDateStr[..4]);
+                            var month = int.Parse(createDateStr.Substring(4, 2));
+                            var day = int.Parse(createDateStr.Substring(6, 2));
+
+                            var hour = int.Parse(createTimeStr[..2]);
+                            var minute = int.Parse(createTimeStr.Substring(2, 2));
+                            var second = int.Parse(createTimeStr.Substring(4, 2));
+
+                            dataEvento = new DateTime(year, month, day, hour, minute, second, DateTimeKind.Utc);
+                        }
+                    }
+                }
+            }
+            else if (sapData.TryGetProperty("U_Data", out var legacyDateProp) &&
+                     DateTime.TryParse(legacyDateProp.GetString(), out var legacyDt))
+            {
+                dataEvento = legacyDt;
+            }
+        }
+        catch
+        {
+            dataEvento = DateTime.UtcNow;
+        }
+
+        return new StoricoModificaDto
         {
             Id = sapData.TryGetProperty("Code", out var code) ? ExtractNumericId(code.GetString()) : 0,
             NumeroProgetto = numeroProgetto,
-            Data = sapData.TryGetProperty("U_Data", out var date) && DateTime.TryParse(date.GetString(), out var dt) ? dt : DateTime.UtcNow,
+            Data = dataEvento,
             Utente = sapData.TryGetProperty("U_Utente", out var user) ? user.GetString() ?? string.Empty : string.Empty,
             Azione = sapData.TryGetProperty("U_Azione", out var action) ? action.GetString() ?? string.Empty : string.Empty,
             Descrizione = sapData.TryGetProperty("U_Descrizione", out var desc) ? desc.GetString() ?? string.Empty : string.Empty,

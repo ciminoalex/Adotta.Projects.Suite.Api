@@ -12,7 +12,7 @@ public class ProjectService : IProjectService
     private const string LivelliTable = "@AX_ADT_PROJLVL";
     private const string ProdottiTable = "@AX_ADT_PROPRD";
     private const string MessaggiTable = "AX_ADT_PROMSG";
-    private const string ChangeLogTable = "@AX_ADT_PROCHG";
+    private const string ChangeLogTable = "AX_ADT_PROCHG";
 
     private static readonly IReadOnlyDictionary<string, string> ProjectPatchMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -92,10 +92,18 @@ public class ProjectService : IProjectService
         // Confronta le versioni e genera le modifiche PRIMA dell'update
         var changeLogEntries = GenerateChangeLogEntries(numeroProgetto, existingProject, project, utente);
 
-        // Include le modifiche nel payload SAP come collection
-        var sapUDO = ProjectMapper.MapProjectToSapUDO(project, changeLogEntries);
+        // Aggiorna il progetto senza più includere il dettaglio ChangeLog come child table
+        var sapUDO = ProjectMapper.MapProjectToSapUDO(project);
         var result = await _sapClient.UpdateRecordAsync<JsonElement>(ProjectTable, numeroProgetto, sapUDO, sessionId);
         
+        // Registra le modifiche nella nuova masterdata AX_ADT_PROCHG
+        foreach (var change in changeLogEntries)
+        {
+            var payloadChange = MapChangeLogToSap(numeroProgetto, change);
+            await _sapClient.CreateRecordAsync<JsonElement>(ChangeLogTable, payloadChange, sessionId);
+        }
+
+
         // SAP returns 204 No Content on PATCH, so re-fetch the updated project
         ProjectDto updated;
         if (result.ValueKind == JsonValueKind.Undefined || result.ValueKind == JsonValueKind.Null)
@@ -179,10 +187,15 @@ public class ProjectService : IProjectService
         // Confronta le versioni e genera le modifiche PRIMA dell'update
         var changeLogEntries = GenerateChangeLogEntries(numeroProgetto, originalProject, existingProject, utente);
 
-        // Use MapProjectToSapUDO to ensure collections are formatted correctly (same as PUT)
-        // This approach worked before - collections were saved correctly
-        // Include le modifiche nel payload SAP come collection
-        var sapUDO = ProjectMapper.MapProjectToSapUDO(existingProject, changeLogEntries);
+        // Registra le modifiche nella nuova masterdata AX_ADT_PROCHG
+        foreach (var change in changeLogEntries)
+        {
+            var payloadChange = MapChangeLogToSap(numeroProgetto, change);
+            await _sapClient.CreateRecordAsync<JsonElement>(ChangeLogTable, payloadChange, sessionId);
+        }
+
+        // Usa MapProjectToSapUDO per aggiornare il progetto (senza più includere la collection di ChangeLog)
+        var sapUDO = ProjectMapper.MapProjectToSapUDO(existingProject);
         
         _logger.LogDebug("PATCH payload for project {NumeroProgetto} contains {Count} fields: {Fields}", 
             numeroProgetto, ((Dictionary<string, object?>)sapUDO).Count, 
@@ -273,30 +286,14 @@ public class ProjectService : IProjectService
 
     public async Task<List<StoricoModificaDto>> GetStoricoAsync(string numeroProgetto, string sessionId)
     {
-        // Child tables can only be retrieved through parent project
-        var project = await GetProjectByCodeAsync(numeroProgetto, sessionId);
-        if (project == null) return new List<StoricoModificaDto>();
-        
-        // Extract storico from the project response
-        var sapData = await _sapClient.GetRecordAsync<JsonElement>(ProjectTable, numeroProgetto, sessionId);
-        if (sapData.ValueKind == JsonValueKind.Undefined || sapData.ValueKind == JsonValueKind.Null)
-            return new List<StoricoModificaDto>();
-        
-        var storico = new List<StoricoModificaDto>();
-        
-        // Leggi AX_ADT_PROHISTCollection (storico modifiche tradizionale)
-        if (sapData.TryGetProperty("AX_ADT_PROHISTCollection", out var storicoArray) && storicoArray.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in storicoArray.EnumerateArray())
-            {
-                storico.Add(ProjectMapper.MapStoricoFromSap(item));
-            }
-        }
-        
-        // NOTA: I ChangeLog vengono restituiti direttamente tramite GetChangeLogAsync o nel progetto.ChangeLog
-        // Non li includiamo qui per evitare duplicati - vengono gestiti separatamente nell'endpoint
-        
-        return storico;
+        // Lo storico ora è basato esclusivamente su AX_ADT_PROCHG (masterdata)
+        var filter = $"U_Project eq '{numeroProgetto}'";
+        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(ChangeLogTable, filter, sessionId);
+
+        // Mappa le righe del ChangeLog nello stesso DTO usato in precedenza per lo storico tradizionale
+        return sapData
+            .Select(item => ProjectMapper.MapStoricoFromSap(item, numeroProgetto))
+            .ToList();
     }
 
     public async Task<LivelloProgettoDto> CreateLivelloAsync(string numeroProgetto, LivelloProgettoDto livello, string sessionId)
@@ -341,30 +338,6 @@ public class ProjectService : IProjectService
         await _sapClient.DeleteRecordAsync(ProdottiTable, code, sessionId);
     }
 
-    public async Task<List<StoricoModificaDto>> CreateWicSnapshotAsync(string numeroProgetto, string sessionId)
-    {
-        // Get current project
-        var project = await GetProjectByCodeAsync(numeroProgetto, sessionId);
-        if (project == null) return new List<StoricoModificaDto>();
-
-        var snapshotEntry = new
-        {
-            Code = Guid.NewGuid().ToString("N"),
-            Name = $"WIC Snapshot {DateTime.UtcNow:yyyyMMddHHmmss}",
-            U_Parent = numeroProgetto,
-            U_DataModifica = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss"),
-            U_UtenteModifica = "System",
-            U_CampoModificato = "WIC Snapshot",
-            U_ValorePrecedente = project.VersioneWIC,
-            U_NuovoValore = project.VersioneWIC,
-            U_VersioneWIC = project.VersioneWIC ?? "WIC-1.0",
-            U_Descrizione = $"Snapshot generata il {DateTime.UtcNow:dd/MM/yyyy HH:mm:ss}"
-        };
-
-        await _sapClient.CreateRecordAsync<JsonElement>("@AX_ADT_PROHIST", snapshotEntry, sessionId);
-        return await GetStoricoAsync(numeroProgetto, sessionId);
-    }
-
     public async Task<List<ProdottoProgettoDto>> GetProdottiByLivelloAsync(string numeroProgetto, int livelloId, string sessionId)
     {
         var filter = $"U_Parent eq '{numeroProgetto}' and U_LivelloId eq '{livelloId}'";
@@ -401,20 +374,6 @@ public class ProjectService : IProjectService
         // Use messaggioId directly as Code if it looks like a GUID, otherwise use BuildMessageCode for backward compatibility
         var code = IsGuid(messaggioId) ? messaggioId : BuildMessageCode(numeroProgetto, messaggioId);
         await _sapClient.DeleteRecordAsync(MessaggiTable, code, sessionId);
-    }
-
-    public async Task<List<ChangeLogDto>> GetChangeLogAsync(string numeroProgetto, string sessionId)
-    {
-        var filter = $"U_Project eq '{numeroProgetto}'";
-        var sapData = await _sapClient.GetRecordsAsync<JsonElement>(ChangeLogTable, filter, sessionId);
-        return sapData.Select(item => ProjectMapper.MapChangeLogFromSap(item, numeroProgetto)).ToList();
-    }
-
-    public async Task<ChangeLogDto> CreateChangeLogAsync(string numeroProgetto, ChangeLogDto change, string sessionId)
-    {
-        var payload = MapChangeLogToSap(numeroProgetto, change);
-        var created = await _sapClient.CreateRecordAsync<JsonElement>(ChangeLogTable, payload, sessionId);
-        return ProjectMapper.MapChangeLogFromSap(created, numeroProgetto);
     }
 
     public async Task<ProjectExportResultDto> ExportProjectsAsync(string format, ProjectExportRequestDto request, string sessionId)
@@ -719,7 +678,7 @@ public class ProjectService : IProjectService
 
     private static string BuildMessageCode(string numeroProgetto, string messaggioId) => $"{numeroProgetto}-MSG{messaggioId}";
 
-    private object MapChangeLogToSap(string numeroProgetto, ChangeLogDto change)
+    private object MapChangeLogToSap(string numeroProgetto, StoricoModificaDto change)
     {
         var ensuredId = EnsureEntityId(change.Id);
         change.Id = ensuredId;
@@ -1034,9 +993,9 @@ public class ProjectService : IProjectService
     /// <summary>
     /// Genera le entry del ChangeLog confrontando due versioni del progetto
     /// </summary>
-    private List<ChangeLogDto> GenerateChangeLogEntries(string numeroProgetto, ProjectDto oldVersion, ProjectDto newVersion, string? utente)
+    private List<StoricoModificaDto> GenerateChangeLogEntries(string numeroProgetto, ProjectDto oldVersion, ProjectDto newVersion, string? utente)
     {
-        var changeLogEntries = new List<ChangeLogDto>();
+        var changeLogEntries = new List<StoricoModificaDto>();
 
         try
         {
@@ -1050,7 +1009,7 @@ public class ProjectService : IProjectService
 
             // Crea un ChangeLog entry con tutte le modifiche nei dettagli
             // Questa entry verrà inclusa come collection nel payload SAP
-            var changeLog = new ChangeLogDto
+            var changeLog = new StoricoModificaDto
             {
                 NumeroProgetto = numeroProgetto,
                 Data = DateTime.UtcNow,

@@ -38,21 +38,21 @@ public class TimesheetController : ControllerBase
         }
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<TimesheetEntryDto>> GetById(int id)
+    [HttpGet("{code}")]
+    public async Task<ActionResult<TimesheetEntryDto>> GetById(string code)
     {
         try
         {
-            var entry = await _timesheetService.GetEntryByIdAsync(id, GetSessionId());
+            var entry = await _timesheetService.GetEntryByIdAsync(code, GetSessionId());
             if (entry == null)
             {
-                return NotFound(new { message = $"Timesheet entry '{id}' not found" });
+                return NotFound(new { message = $"Timesheet entry '{code}' not found" });
             }
             return Ok(entry);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting timesheet entry: {Id}", id);
+            _logger.LogError(ex, "Error getting timesheet entry: {Code}", code);
             return StatusCode(500, new { message = "Error retrieving timesheet entry", error = ex.Message });
         }
     }
@@ -63,7 +63,8 @@ public class TimesheetController : ControllerBase
         try
         {
             var created = await _timesheetService.CreateEntryAsync(entry, GetSessionId());
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+            // La route di GetById usa il parametro {code}, quindi lo usiamo anche qui
+            return CreatedAtAction(nameof(GetById), new { code = created.Id }, created);
         }
         catch (Exception ex)
         {
@@ -72,32 +73,32 @@ public class TimesheetController : ControllerBase
         }
     }
 
-    [HttpPut("{id}")]
-    public async Task<ActionResult<TimesheetEntryDto>> Update(int id, [FromBody] TimesheetEntryDto entry)
+    [HttpPut("{code}")]
+    public async Task<ActionResult<TimesheetEntryDto>> Update(string code, [FromBody] TimesheetEntryDto entry)
     {
         try
         {
-            var updated = await _timesheetService.UpdateEntryAsync(id, entry, GetSessionId());
+            var updated = await _timesheetService.UpdateEntryAsync(code, entry, GetSessionId());
             return Ok(updated);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating timesheet entry: {Id}", id);
+            _logger.LogError(ex, "Error updating timesheet entry: {Code}", code);
             return StatusCode(500, new { message = "Error updating timesheet entry", error = ex.Message });
         }
     }
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    [HttpDelete("{code}")]
+    public async Task<IActionResult> Delete(string code)
     {
         try
         {
-            await _timesheetService.DeleteEntryAsync(id, GetSessionId());
+            await _timesheetService.DeleteEntryAsync(code, GetSessionId());
             return NoContent();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting timesheet entry: {Id}", id);
+            _logger.LogError(ex, "Error deleting timesheet entry: {Code}", code);
             return StatusCode(500, new { message = "Error deleting timesheet entry", error = ex.Message });
         }
     }

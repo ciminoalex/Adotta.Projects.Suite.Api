@@ -356,25 +356,11 @@ public class ProjectsController : ControllerBase
     {
         try
         {
-            // Restituisce sia StoricoModifica che ChangeLog
-            // Il ChangeLog viene restituito con la stessa struttura del modello del progetto
-            var project = await _projectService.GetProjectByCodeAsync(numeroProgetto, GetSessionId());
-            if (project == null)
-            {
-                return NotFound(new { message = $"Project '{numeroProgetto}' not found" });
-            }
-
             var result = new List<object>();
             
             // Aggiungi StoricoModifica tradizionale
             var storico = await _projectService.GetStoricoAsync(numeroProgetto, GetSessionId());
             result.AddRange(storico);
-            
-            // Aggiungi ChangeLog con la stessa struttura del modello del progetto
-            if (project.ChangeLog != null && project.ChangeLog.Count > 0)
-            {
-                result.AddRange(project.ChangeLog);
-            }
             
             return Ok(result);
         }
@@ -382,21 +368,6 @@ public class ProjectsController : ControllerBase
         {
             _logger.LogError(ex, "Error getting storico for project: {NumeroProgetto}", numeroProgetto);
             return StatusCode(500, new { message = "Error retrieving storico", error = ex.Message });
-        }
-    }
-
-    [HttpPost("{numeroProgetto}/wic-snapshot")]
-    public async Task<ActionResult<List<StoricoModificaDto>>> CreateWicSnapshot(string numeroProgetto)
-    {
-        try
-        {
-            var snapshot = await _projectService.CreateWicSnapshotAsync(numeroProgetto, GetSessionId());
-            return Ok(snapshot);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating WIC snapshot for project: {NumeroProgetto}", numeroProgetto);
-            return StatusCode(500, new { message = "Error creating WIC snapshot", error = ex.Message });
         }
     }
 
@@ -457,36 +428,6 @@ public class ProjectsController : ControllerBase
         {
             _logger.LogError(ex, "Error deleting messaggio {MessaggioId} for project: {NumeroProgetto}", messaggioId, numeroProgetto);
             return StatusCode(500, new { message = "Error deleting messaggio", error = ex.Message });
-        }
-    }
-
-    [HttpGet("{numeroProgetto}/changelog")]
-    public async Task<ActionResult<List<ChangeLogDto>>> GetChangeLog(string numeroProgetto)
-    {
-        try
-        {
-            var changelog = await _projectService.GetChangeLogAsync(numeroProgetto, GetSessionId());
-            return Ok(changelog);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting changelog for project: {NumeroProgetto}", numeroProgetto);
-            return StatusCode(500, new { message = "Error retrieving changelog", error = ex.Message });
-        }
-    }
-
-    [HttpPost("{numeroProgetto}/changelog")]
-    public async Task<ActionResult<ChangeLogDto>> CreateChangeLog(string numeroProgetto, [FromBody] ChangeLogDto change)
-    {
-        try
-        {
-            var created = await _projectService.CreateChangeLogAsync(numeroProgetto, change, GetSessionId());
-            return CreatedAtAction(nameof(GetChangeLog), new { numeroProgetto }, created);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating changelog for project: {NumeroProgetto}", numeroProgetto);
-            return StatusCode(500, new { message = "Error creating changelog", error = ex.Message });
         }
     }
 
