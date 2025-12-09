@@ -4,7 +4,8 @@ namespace ADOTTA.Projects.Suite.Api.DTOs;
 
 public class UserDto
 {
-    public string Code { get; set; } = string.Empty;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Code { get; set; }
     public string UserCode { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;

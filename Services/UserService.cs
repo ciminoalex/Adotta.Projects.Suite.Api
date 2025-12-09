@@ -79,6 +79,13 @@ public class UserService : IUserService
         user.Code = code;
         var sapPayload = MapToSapRecord(user, isUpdate: true);
         var updated = await _sapClient.UpdateRecordAsync<JsonElement>(TableName, code, sapPayload, sessionId);
+        
+        // Se la risposta è vuota (NoContent), recupera il record aggiornato
+        if (updated.ValueKind == JsonValueKind.Undefined || updated.ValueKind == JsonValueKind.Null)
+        {
+            updated = await _sapClient.GetRecordAsync<JsonElement>(TableName, code, sessionId);
+        }
+        
         return MapToUserDto(updated);
     }
 

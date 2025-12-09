@@ -70,3 +70,33 @@ public class ProdottoProgettoValidator : AbstractValidator<ProdottoProgettoDto>
     }
 }
 
+public class UserValidator : AbstractValidator<UserDto>
+{
+    public UserValidator()
+    {
+        // Code non è obbligatorio perché viene generato automaticamente dall'API tramite GUID
+        // Non aggiungiamo regole per Code
+        
+        RuleFor(x => x.UserCode)
+            .NotEmpty().WithMessage("UserCode is required")
+            .MaximumLength(100).WithMessage("UserCode must not exceed 100 characters");
+
+        RuleFor(x => x.Email)
+            .NotEmpty().WithMessage("Email is required")
+            .EmailAddress().WithMessage("Email must be a valid email address")
+            .MaximumLength(255).WithMessage("Email must not exceed 255 characters");
+
+        RuleFor(x => x.UserName)
+            .NotEmpty().WithMessage("UserName is required")
+            .MaximumLength(200).WithMessage("UserName must not exceed 200 characters");
+
+        RuleFor(x => x.Ruolo)
+            .NotEmpty().WithMessage("Ruolo is required")
+            .MaximumLength(50).WithMessage("Ruolo must not exceed 50 characters");
+
+        RuleFor(x => x.TeamTecnico)
+            .MaximumLength(100).WithMessage("TeamTecnico must not exceed 100 characters")
+            .When(x => !string.IsNullOrWhiteSpace(x.TeamTecnico));
+    }
+}
+

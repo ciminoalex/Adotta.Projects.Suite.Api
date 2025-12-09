@@ -300,7 +300,7 @@ public static class ProjectMapper
 
         return new MessaggioProgettoDto
         {
-            Id = sapData.TryGetProperty("Code", out var code) ? code.GetString() : "",
+            Id = sapData.TryGetProperty("Code", out var code) ? code.GetString() ?? string.Empty : string.Empty,
             NumeroProgetto = numeroProgetto,
             Data = dataMessaggio,
             Utente = sapData.TryGetProperty("U_Utente", out var user) ? user.GetString() ?? string.Empty : string.Empty,
