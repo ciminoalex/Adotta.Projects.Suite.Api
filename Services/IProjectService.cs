@@ -31,5 +31,6 @@ public interface IProjectService
     Task<ProjectStatsDto> GetProjectStatsAsync(string sessionId);
     Task<List<ProjectStatsByStatusDto>> GetStatsByStatusAsync(string sessionId);
     Task<List<ProjectStatsByMonthDto>> GetStatsByMonthAsync(string sessionId);
+    Task<OrdineClienteDto?> GetOrdineClienteByDocNumAsync(int docNum, string sessionId);
 }
 

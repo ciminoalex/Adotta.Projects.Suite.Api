@@ -490,5 +490,26 @@ public class ProjectsController : ControllerBase
             return StatusCode(500, new { message = "Error retrieving stats", error = ex.Message });
         }
     }
+
+    [HttpGet("ordine-cliente/{docNum}")]
+    public async Task<ActionResult<OrdineClienteDto>> GetOrdineCliente(int docNum)
+    {
+        try
+        {
+            var ordine = await _projectService.GetOrdineClienteByDocNumAsync(docNum, GetSessionId());
+            
+            if (ordine == null)
+            {
+                return NotFound(new { message = $"Ordine cliente con DocNum '{docNum}' non trovato" });
+            }
+
+            return Ok(ordine);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting ordine cliente: {DocNum}", docNum);
+            return StatusCode(500, new { message = "Error retrieving ordine cliente", error = ex.Message });
+        }
+    }
 }
 

@@ -453,6 +453,98 @@ public class ProjectService : IProjectService
             .ToList();
     }
 
+    public async Task<OrdineClienteDto?> GetOrdineClienteByDocNumAsync(int docNum, string sessionId)
+    {
+        try
+        {
+            var filter = $"DocNum eq {docNum}";
+            var ordini = await _sapClient.GetRecordsAsync<JsonElement>("Orders", filter, sessionId);
+            
+            var ordine = ordini.FirstOrDefault();
+            
+            if (ordine.ValueKind == JsonValueKind.Undefined || ordine.ValueKind == JsonValueKind.Null)
+            {
+                return null;
+            }
+
+            return MapToOrdineClienteDto(ordine);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting ordine cliente: {DocNum}", docNum);
+            throw;
+        }
+    }
+
+    private OrdineClienteDto MapToOrdineClienteDto(JsonElement sapData)
+    {
+        var ordine = new OrdineClienteDto();
+
+        if (sapData.TryGetProperty("DocNum", out var docNum))
+            ordine.DocNum = docNum.GetInt32();
+
+        if (sapData.TryGetProperty("DocEntry", out var docEntry))
+            ordine.DocEntry = docEntry.GetInt32();
+
+        if (sapData.TryGetProperty("CardCode", out var cardCode))
+            ordine.CardCode = cardCode.GetString() ?? string.Empty;
+
+        if (sapData.TryGetProperty("CardName", out var cardName))
+            ordine.CardName = cardName.GetString() ?? string.Empty;
+
+        if (sapData.TryGetProperty("DocDate", out var docDate) && docDate.ValueKind == JsonValueKind.String)
+        {
+            if (DateTime.TryParse(docDate.GetString(), out var date))
+                ordine.DocDate = date;
+        }
+
+        if (sapData.TryGetProperty("DocDueDate", out var docDueDate) && docDueDate.ValueKind == JsonValueKind.String)
+        {
+            if (DateTime.TryParse(docDueDate.GetString(), out var dueDate))
+                ordine.DocDueDate = dueDate;
+        }
+
+        if (sapData.TryGetProperty("TaxDate", out var taxDate) && taxDate.ValueKind == JsonValueKind.String)
+        {
+            if (DateTime.TryParse(taxDate.GetString(), out var taxDt))
+                ordine.TaxDate = taxDt;
+        }
+
+        if (sapData.TryGetProperty("DocTotal", out var docTotal))
+        {
+            if (docTotal.ValueKind == JsonValueKind.Number)
+                ordine.DocTotal = docTotal.GetDecimal();
+        }
+
+        if (sapData.TryGetProperty("DocStatus", out var docStatus))
+            ordine.DocStatus = docStatus.GetString();
+
+        if (sapData.TryGetProperty("Comments", out var comments))
+            ordine.Comments = comments.GetString();
+
+        if (sapData.TryGetProperty("City", out var city))
+            ordine.City = city.GetString();
+
+        if (sapData.TryGetProperty("ZipCode", out var zipCode))
+            ordine.ZipCode = zipCode.GetString();
+
+        if (sapData.TryGetProperty("Country", out var country))
+            ordine.Country = country.GetString();
+
+        if (sapData.TryGetProperty("SalesPersonCode", out var salesPersonCode))
+            ordine.SalesPersonCode = salesPersonCode.GetString();
+
+        if (sapData.TryGetProperty("DocCur", out var currency))
+            ordine.Currency = currency.GetString();
+
+        if (sapData.TryGetProperty("NumAtCard", out var numAtCard))
+        {
+            if (numAtCard.ValueKind == JsonValueKind.Number)
+                ordine.NumAtCard = numAtCard.GetInt32();
+        }
+        return ordine;
+    }
+
     private ProjectDto MapToProjectDto(JsonElement sapData)
     {
         return ProjectMapper.MapSapUDOToProject(sapData);
