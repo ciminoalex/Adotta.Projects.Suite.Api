@@ -517,25 +517,25 @@ public class ProjectService : IProjectService
         }
 
         if (sapData.TryGetProperty("DocStatus", out var docStatus))
-            ordine.DocStatus = docStatus.GetString();
+            ordine.DocStatus = docStatus.ValueKind == JsonValueKind.String ? docStatus.GetString() : docStatus.GetRawText();
 
         if (sapData.TryGetProperty("Comments", out var comments))
-            ordine.Comments = comments.GetString();
+            ordine.Comments = comments.ValueKind == JsonValueKind.String ? comments.GetString() : null;
 
         if (sapData.TryGetProperty("City", out var city))
-            ordine.City = city.GetString();
+            ordine.City = city.ValueKind == JsonValueKind.String ? city.GetString() : null;
 
         if (sapData.TryGetProperty("ZipCode", out var zipCode))
-            ordine.ZipCode = zipCode.GetString();
+            ordine.ZipCode = zipCode.ValueKind == JsonValueKind.String ? zipCode.GetString() : zipCode.GetRawText();
 
         if (sapData.TryGetProperty("Country", out var country))
-            ordine.Country = country.GetString();
+            ordine.Country = country.ValueKind == JsonValueKind.String ? country.GetString() : null;
 
         if (sapData.TryGetProperty("SalesPersonCode", out var salesPersonCode))
-            ordine.SalesPersonCode = salesPersonCode.GetString();
+            ordine.SalesPersonCode = salesPersonCode.ValueKind == JsonValueKind.String ? salesPersonCode.GetString() : salesPersonCode.GetRawText();
 
         if (sapData.TryGetProperty("DocCur", out var currency))
-            ordine.Currency = currency.GetString();
+            ordine.Currency = currency.ValueKind == JsonValueKind.String ? currency.GetString() : currency.GetRawText();
 
         if (sapData.TryGetProperty("NumAtCard", out var numAtCard))
         {
