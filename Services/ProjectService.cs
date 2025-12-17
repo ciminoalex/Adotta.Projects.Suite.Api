@@ -457,7 +457,7 @@ public class ProjectService : IProjectService
     {
         try
         {
-            var filter = $"DocNum eq {docNum}";
+            var filter = $"DocNum eq {docNum} and U_TypeDoc eq 'OC'";
             var ordini = await _sapClient.GetRecordsAsync<JsonElement>("Orders", filter, sessionId);
             
             var ordine = ordini.FirstOrDefault();
@@ -522,15 +522,6 @@ public class ProjectService : IProjectService
         if (sapData.TryGetProperty("Comments", out var comments))
             ordine.Comments = comments.ValueKind == JsonValueKind.String ? comments.GetString() : null;
 
-        if (sapData.TryGetProperty("City", out var city))
-            ordine.City = city.ValueKind == JsonValueKind.String ? city.GetString() : null;
-
-        if (sapData.TryGetProperty("ZipCode", out var zipCode))
-            ordine.ZipCode = zipCode.ValueKind == JsonValueKind.String ? zipCode.GetString() : zipCode.GetRawText();
-
-        if (sapData.TryGetProperty("Country", out var country))
-            ordine.Country = country.ValueKind == JsonValueKind.String ? country.GetString() : null;
-
         if (sapData.TryGetProperty("SalesPersonCode", out var salesPersonCode))
             ordine.SalesPersonCode = salesPersonCode.ValueKind == JsonValueKind.String ? salesPersonCode.GetString() : salesPersonCode.GetRawText();
 
@@ -542,6 +533,34 @@ public class ProjectService : IProjectService
             if (numAtCard.ValueKind == JsonValueKind.Number)
                 ordine.NumAtCard = numAtCard.GetInt32();
         }
+
+        if (sapData.TryGetProperty("AddressExtension", out var addExt))
+        {
+            if (addExt.TryGetProperty("ShipToCity", out var shipToCity))
+                ordine.City = shipToCity.GetString() ?? string.Empty;
+
+            if (addExt.TryGetProperty("ShipToZipCode", out var shipToZipCode))
+                ordine.ZipCode = shipToZipCode.GetString() ?? string.Empty;
+
+            if (addExt.TryGetProperty("ShipToCountry", out var shipToCountry))
+            {
+                var country = shipToCountry.GetString() ?? string.Empty;
+
+                if (string.Equals(country, "US", StringComparison.OrdinalIgnoreCase) &&
+                    addExt.TryGetProperty("ShipToState", out var shipToState))
+                {
+                    var state = shipToState.GetString();
+                    ordine.Country = !string.IsNullOrEmpty(state)
+                        ? $"{country}-{state}"
+                        : country;
+                }
+                else
+                {
+                    ordine.Country = country;
+                }
+            }
+
+        }   
         return ordine;
     }
 
